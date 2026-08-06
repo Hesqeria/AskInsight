@@ -1,0 +1,21 @@
+name: "user_profile"
+description: "User Cohort Analysis: purchase frequency x retention x LTV"
+steps:
+  - id: schema
+    type: schema_recall
+    params: {limit: 8}
+  - id: sql_gen
+    type: sql_generate
+    params: {dialect: doris}
+    depends: [schema]
+  - id: sql_exec
+    type: sql_execute
+    params: {datasource: dw}
+    depends: [sql_gen]
+  - id: analysis
+    type: llm_call
+    params: {prompt_type: cohort_analysis}
+    depends: [sql_exec]
+  - id: chart
+    type: chart_render
+    depends: [sql_exec]

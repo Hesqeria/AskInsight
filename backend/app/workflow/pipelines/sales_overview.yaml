@@ -1,0 +1,17 @@
+name: "sales_overview"
+description: "Sales Overview: GMV trend x category share x regional distribution"
+steps:
+  - id: schema
+    type: schema_recall
+    params: {limit: 5}
+  - id: sql_gen
+    type: sql_generate
+    params: {dialect: doris}
+    depends: [schema]
+  - id: sql_exec
+    type: sql_execute
+    params: {datasource: dw}
+    depends: [sql_gen]
+  - id: chart
+    type: chart_render
+    depends: [sql_exec]

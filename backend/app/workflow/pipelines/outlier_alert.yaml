@@ -1,0 +1,22 @@
+name: "outlier_alert"
+description: "Anomaly Detection: flag metrics outside 2-sigma bands"
+steps:
+  - id: schema
+    type: schema_recall
+    params: {limit: 10}
+  - id: sql_gen
+    type: sql_generate
+    params: {dialect: postgresql}
+    depends: [schema]
+  - id: sql_exec
+    type: sql_execute
+    params: {datasource: data_agent}
+    depends: [sql_gen]
+  - id: outlier_detect
+    type: llm_call
+    params: {prompt_type: outlier_detection}
+    depends: [sql_exec]
+  - id: alert
+    type: alert_dispatch
+    params: {channel: email}
+    depends: [outlier_detect]
