@@ -1,6 +1,6 @@
-"""MySQL client manager (multi-datasource adapter).
+"""MySQL 客户端管理器（多数据源适配）
 
-Same interface as DorisClientManager, using the mysql+asyncmy driver.
+与 DorisClientManager 接口一致，使用 mysql+asyncmy 驱动。
 """
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine

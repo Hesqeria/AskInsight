@@ -1,7 +1,7 @@
-"""Data source router selector.
+"""数据源路由选择器
 
-Automatically selects Doris / MySQL / PostgreSQL data source based on config.
-Supports runtime switching.
+根据配置自动选择 Doris / MySQL / PostgreSQL 数据源。
+支持运行时切换。
 """
 from enum import Enum
 
@@ -18,13 +18,13 @@ _active_source: DataSourceType = DataSourceType.DORIS
 
 
 def set_active_source(source: str):
-    """Switch the active data source."""
+    """切换活跃数据源"""
     global _active_source
     try:
         _active_source = DataSourceType(source.lower())
-        logger.info(f"Data source switched: {_active_source.value}")
+        logger.info(f"数据源切换: {_active_source.value}")
     except ValueError:
-        logger.error(f"Unknown data source: {source}, supported: doris/mysql/pg")
+        logger.error(f"未知数据源: {source}，支持: doris/mysql/pg")
 
 
 def get_active_source() -> DataSourceType:
@@ -32,7 +32,7 @@ def get_active_source() -> DataSourceType:
 
 
 def get_client_manager():
-    """Get the client manager for the current data source."""
+    """获取当前数据源的客户端管理器"""
     from app.clients.doris_client_manager import doris_client_manager
     from app.clients.mysql_client_manager import mysql_client_manager
     from app.clients.pg_client_manager import pg_client_manager
@@ -46,7 +46,7 @@ def get_client_manager():
 
 
 def get_repository(session):
-    """Get the Repository for the current data source."""
+    """获取当前数据源的 Repository"""
     from app.repositories.doris.dw.dw_doris_repository import DwDorisRepository
     from app.repositories.mysql.mysql_repository import MySQLRepository
     from app.repositories.pg.pg_repository import PGRepository

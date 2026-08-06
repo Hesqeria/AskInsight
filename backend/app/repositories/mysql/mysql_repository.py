@@ -1,10 +1,10 @@
-"""MySQL Repository (interface-compatible with PGRepository / DwDorisRepository)."""
+"""MySQL Repository（与 PGRepository / DwDorisRepository 接口兼容）"""
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class MySQLRepository:
-    """MySQL data warehouse query."""
+    """MySQL 数据仓库查询"""
 
     def __init__(self, session: AsyncSession):
         self.session = session

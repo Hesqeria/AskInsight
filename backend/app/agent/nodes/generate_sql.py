@@ -1,4 +1,4 @@
-"""generate_sql node (P0+P1 optimized version: enhanced DDL + dimension value injection + concise rules + multi-candidate voting)"""
+"""generate_sql 节点（P0+P1 优化版：DDL 增强 + 维度值注入 + 精简规则 + 多候选投票）"""
 import yaml
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import PromptTemplate
@@ -8,17 +8,18 @@ from app.agent.context import DataAgentContext
 from app.agent.state import DataAgentState
 from app.agent.llm import llm
 from app.core.log import logger
+from app.core.sql_dialect import get_dialect_info
 from app.prompt.prompt_loader import load_prompt
 
 
 def table_infos_to_ddl(table_infos: list) -> str:
-    """Enhanced DDL (including REFERENCES + COMMENT + example values)"""
+    """增强版 DDL（含 REFERENCES + COMMENT + 示例值）"""
     if not table_infos:
-        return "-- No tables available"
+        return "-- 无可用表"
 
     pk_map = {}
-    pk_col_map = {}  # table name -> actual PK column name (for precise REFERENCES generation)
-    # Original PK mapping (column name -> table name)
+    pk_col_map = {}  # 表名 → 实际 PK 列名（用于 REFERENCES 精确生成）
+    # 原始 PK 映射（列名 → 表名）
     raw_pk_map = {}
     for t in table_infos:
         for c in t.get("columns", []):
@@ -27,15 +28,15 @@ def table_infos_to_ddl(table_infos: list) -> str:
                 pk_map[c.get("name", "")] = t.get("name", "")
                 pk_col_map[t.get("name", "")] = c.get("name", "")
 
-    # Smart inference of FK->PK mapping (xxx_id -> dim_xxx.id)
-    # Rule: user_id -> dim_user_info.id, sku_id -> dim_sku_info.id
-    # Iterate directly over all table_infos to avoid the raw_pk_map["id"] overwrite issue
+    # 智能推断 FK→PK 映射（xxx_id → dim_xxx.id）
+    # 规则：user_id → dim_user_info.id, sku_id → dim_sku_info.id
+    # 直接遍历所有 table_infos 避免 raw_pk_map["id"] 覆盖问题
     for t in table_infos:
         tbl_name = t.get("name", "")
         has_id_pk = any(c.get("role") == "primary_key" and c.get("name") == "id" for c in t.get("columns", []))
         if not has_id_pk:
             continue
-        # The PK of dim_xxx tables is named id -> register all possible FK variants
+        # dim_xxx 表的主键叫 id → 注册所有可能的 FK 变体
         suffix = tbl_name
         for prefix in ("dim_", "dws_", "dwd_", "ads_", "ods_"):
             if tbl_name.startswith(prefix):
@@ -45,13 +46,13 @@ def table_infos_to_ddl(table_infos: list) -> str:
         if len(parts) >= 1:
             base = parts[0]
             fk_candidate = base + "_id"
-            # dim > dws > others (only dim is the correct JOIN target for FK)
+            # dim > dws > 其他（dim 才是 FK 的正确 JOIN 目标）
             existing = pk_map.get(fk_candidate, "")
             if not existing:
                 pk_map[fk_candidate] = tbl_name
             elif tbl_name.startswith("dim_") and not existing.startswith("dim_"):
-                pk_map[fk_candidate] = tbl_name  # dim takes priority over dws/fact
-            # Special rules
+                pk_map[fk_candidate] = tbl_name  # dim 优先于 dws/fact
+            # 特殊规则
             if "province" in suffix:
                 pk_map["province_id"] = tbl_name
             if "region" in suffix:
@@ -79,7 +80,7 @@ def table_infos_to_ddl(table_infos: list) -> str:
         tname = t.get("name", "?")
         role = t.get("role", "")
         desc = t.get("description", "")
-        role_tag = "fact table" if role == "fact" else "dimension table"
+        role_tag = "事实表" if role == "fact" else "维度表"
 
         fk_targets = set()
         for c in t.get("columns", []):
@@ -90,7 +91,7 @@ def table_infos_to_ddl(table_infos: list) -> str:
                     fk_targets.add(f"{cname}→{target}")
         header_parts = [desc if desc else tname, f"[{role_tag}]"]
         if fk_targets:
-            header_parts.append(f"Foreign keys: {', '.join(list(fk_targets)[:3])}")
+            header_parts.append(f"外键: {', '.join(list(fk_targets)[:3])}")
 
         lines = [f"-- {' | '.join(header_parts)}"]
         lines.append(f"CREATE TABLE {tname} (")
@@ -115,8 +116,8 @@ def table_infos_to_ddl(table_infos: list) -> str:
 
             comment_parts = []
             role_tags_map = {
-                "primary_key": "primary key", "foreign_key": "foreign key",
-                "measure": "measure (aggregatable)", "dimension": "dimension (groupable/filterable)",
+                "primary_key": "主键", "foreign_key": "外键",
+                "measure": "度量(可聚合)", "dimension": "维度(可分组/过滤)",
             }
             rtag = role_tags_map.get(crole, "")
             if rtag:
@@ -124,9 +125,9 @@ def table_infos_to_ddl(table_infos: list) -> str:
             if cdesc:
                 comment_parts.append(cdesc)
             if calias:
-                comment_parts.append(f"synonyms: {', '.join(str(a) for a in calias[:4])}")
+                comment_parts.append(f"同义词: {', '.join(str(a) for a in calias[:4])}")
             if cexamples and len(cexamples) <= 5:
-                comment_parts.append(f"examples: {', '.join(str(e) for e in cexamples[:3])}")
+                comment_parts.append(f"示例: {', '.join(str(e) for e in cexamples[:3])}")
 
             if comment_parts:
                 col_def += f" COMMENT '{' | '.join(comment_parts)}'"
@@ -143,7 +144,7 @@ def build_dimension_hint(state: DataAgentState) -> str:
     matched = state.get("matched_dimension_values", [])
     if not matched:
         return ""
-    lines = ["[Known dimension values (WHERE must use exact values)]"]
+    lines = ["【已知维度值（WHERE 必须用精确值）】"]
     for m in matched[:10]:
         col = m.get("column_name", "")
         val = m.get("value", "")
@@ -157,9 +158,9 @@ def build_glossary_hint(state: DataAgentState) -> str:
     glossary = state.get("glossary_matches", [])
     if not glossary:
         return ""
-    lines = ["[Glossary mapping]"]
+    lines = ["【术语映射】"]
     for g in glossary[:5]:
-        lines.append(f"- '{g.get('term','')}' -> {g.get('table_name','')}.{g.get('standard_name','')}")
+        lines.append(f"- '{g.get('term','')}' → {g.get('table_name','')}.{g.get('standard_name','')}")
     return "\n".join(lines) + "\n\n"
 
 
@@ -167,14 +168,14 @@ def build_feedback_hint(state: DataAgentState) -> str:
     feedback = state.get("feedback_examples", [])
     if not feedback:
         return ""
-    lines = ["[Historical reference]"]
+    lines = ["【历史参考】"]
     for f in feedback[:3]:
-        lines.append(f"Q: {f.get('query','')}\nSQL: {f.get('sql','')}")
+        lines.append(f"问: {f.get('query','')}\nSQL: {f.get('sql','')}")
     return "\n".join(lines) + "\n\n"
 
 
 def _clean_sql(sql: str) -> str:
-    """6-step format cleanup (Vanna#187 SQLBot#725)"""
+    """6重格式清理 (Vanna#187 SQLBot#725)"""
     bt = chr(96) * 3
     nl = chr(10)
     # 1. markdown code block
@@ -201,7 +202,7 @@ def _clean_sql(sql: str) -> str:
 
 
 async def _generate_one(chain, ddl, metrics, date_info, db_info, query) -> str:
-    """Generate one candidate SQL"""
+    """生成一条候选 SQL"""
     sql = await chain.ainvoke({
         "ddl": ddl,
         "metrics": metrics,
@@ -214,7 +215,7 @@ async def _generate_one(chain, ddl, metrics, date_info, db_info, query) -> str:
 
 async def generate_sql(state: DataAgentState, runtime: Runtime[DataAgentContext]):
     writer = runtime.stream_writer
-    writer({"stage": "Generate SQL"})
+    writer({"stage": "生成 SQL"})
     try:
         table_infos = state.get("table_infos", [])
         metric_infos = state.get("metric_infos", [])
@@ -223,18 +224,19 @@ async def generate_sql(state: DataAgentState, runtime: Runtime[DataAgentContext]
 
         # P0-1: DDL
         ddl_str = table_infos_to_ddl(table_infos)
-        metric_str = yaml.dump(metric_infos, allow_unicode=True, sort_keys=False) if metric_infos else "None"
-        date_str = yaml.dump(date_info, allow_unicode=True, sort_keys=False) if date_info else "None"
-        db_str = yaml.dump(db_info, allow_unicode=True, sort_keys=False) if db_info else "None"
+        metric_str = yaml.dump(metric_infos, allow_unicode=True, sort_keys=False) if metric_infos else "无"
+        date_str = yaml.dump(date_info, allow_unicode=True, sort_keys=False) if date_info else "无"
+        dialect_info = get_dialect_info(db_info.get("dialect", "doris")) if db_info else get_dialect_info("doris")
+        db_str = dialect_info.get("hints", "Apache Doris dialect")
 
-        # P0-2: dynamic context
+        # P0-2: 动态上下文
         dim_hint = build_dimension_hint(state)
         glossary_hint = build_glossary_hint(state)
         feedback_hint = build_feedback_hint(state)
         enriched_query = dim_hint + glossary_hint + feedback_hint + state["query"]
 
-        # P1-2: debug log
-        logger.info(f"DDL input ({len(table_infos)} tables): {ddl_str[:200]}")
+        # P1-2: 调试日志
+        logger.info(f"DDL 输入({len(table_infos)}表): {ddl_str[:200]}")
         logger.info(f"enriched_query: {enriched_query[:150]}")
 
         prompt = PromptTemplate(
@@ -243,36 +245,36 @@ async def generate_sql(state: DataAgentState, runtime: Runtime[DataAgentContext]
         )
         chain = prompt | llm | StrOutputParser()
 
-        # P1-3: multi-candidate SQL voting (generate 2 candidates, pick the consistent one)
+        # P1-3: 多候选 SQL 投票（生成 2 条，选一致的）
         candidates = []
         for i in range(3):
             try:
                 sql = await _generate_one(chain, ddl_str, metric_str, date_str, db_str, enriched_query)
                 candidates.append(sql)
             except Exception as e:
-                logger.warning(f"Candidate {i+1} generation failed: {e}")
+                logger.warning(f"候选 {i+1} 生成失败: {e}")
 
         if not candidates:
-            raise RuntimeError("All candidate SQL generations failed")
+            raise RuntimeError("所有候选 SQL 生成失败")
 
-        # P1-3 voting (3 candidates): if two are identical -> use directly; otherwise -> pick the shorter one that is not "not exist"
+        # P1-3 投票（3条候选）：如果两条一致 → 直接用；不一致 → 选较短的非 "不存在" 的
         final_sql = candidates[0]
         if len(candidates) >= 2:
             if candidates[0] == candidates[1]:
-                logger.info("Two candidates are identical, using directly")
+                logger.info("两候选一致，直接采用")
             else:
-                # Prefer the one that is not "not exist"
+                # 优先选非 "不存在" 的
                 for c in candidates:
-                    if "not exist" not in c.lower() and "message" not in c.lower():
+                    if "不存在" not in c and "message" not in c.lower():
                         final_sql = c
-                        logger.info(f"Voting: pick non-empty candidate -> {c[:80]}")
+                        logger.info(f"投票：选非空候选 -> {c[:80]}")
                         break
                 else:
-                    # Both contain "not exist", take the first one
-                    logger.info("Both candidates returned 'not exist', taking the first one")
+                    # 都含"不存在"，取第一条
+                    logger.info("两候选都返回'不存在'，取第一条")
 
-        logger.info(f"Final SQL: {final_sql[:120]}")
+        logger.info(f"最终 SQL: {final_sql[:120]}")
         return {"sql": final_sql}
     except Exception as e:
-        logger.error(f"Generate SQL error: {e}")
+        logger.error(f"生成 SQL 异常: {e}")
         raise

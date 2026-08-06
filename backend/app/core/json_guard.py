@@ -1,13 +1,13 @@
-"""Fault-tolerant parser for LLM JSON responses.
+"""LLM JSON 响应容错解析器
 
-Addresses WrenAI #1274 (DeepSeekException parse error, 14 comments):
-  JSON returned by the LLM may be wrapped in markdown, contain extra text, or be truncated.
+解决 WrenAI #1274（DeepSeekException 解析错误，14 评论）：
+  LLM 返回的 JSON 可能被 markdown 包裹、含多余文本、或被截断。
 
-Features:
-  1. Extract JSON from markdown code blocks
-  2. Tolerate extra text before/after the JSON
-  3. Fix common JSON format issues (trailing commas, single quotes)
-  4. Safe fallback for truncated JSON
+功能：
+  1. 提取 markdown 代码块中的 JSON
+  2. 容忍 JSON 前后的多余文本
+  3. 修复常见 JSON 格式问题（尾逗号、单引号）
+  4. 截断 JSON 的安全回退
 """
 import json
 import re
@@ -17,27 +17,27 @@ from app.core.log import logger
 
 
 def safe_json_parse(text: str, default: Any = None) -> Any:
-    """Fault-tolerant parsing of JSON returned by the LLM.
+    """容错解析 LLM 返回的 JSON
 
     Args:
-        text: raw text returned by the LLM
-        default: default return value when parsing fails
+        text: LLM 原始返回文本
+        default: 解析失败时的默认返回值
 
     Returns:
-        Parsed Python object, or default
+        解析后的 Python 对象，或 default
     """
     if not text or not text.strip():
         return default
 
     text = text.strip()
 
-    # Strategy 1: parse directly (fastest path)
+    # 策略1: 直接解析（最快路径）
     try:
         return json.loads(text)
     except json.JSONDecodeError:
         pass
 
-    # Strategy 2: extract markdown code block ```json ... ```
+    # 策略2: 提取 markdown 代码块 ```json ... ```
     code_block = _extract_code_block(text)
     if code_block:
         try:
@@ -45,22 +45,22 @@ def safe_json_parse(text: str, default: Any = None) -> Any:
         except json.JSONDecodeError:
             pass
 
-    # Strategy 3: extract the first { ... } or [ ... ], fix then parse
+    # 策略3: 提取第一个 { ... } 或 [ ... ]，先修复再解析
     extracted = _extract_json_object(text)
     if extracted:
-        # Try direct parse first
+        # 先尝试直接解析
         try:
             return json.loads(extracted)
         except json.JSONDecodeError:
             pass
-        # Retry after fixing common issues
+        # 修复常见问题后重试
         fixed = _fix_common_issues(extracted)
         try:
             return json.loads(fixed)
         except json.JSONDecodeError:
             pass
 
-    # Strategy 5: safe fallback for truncated JSON (try to complete)
+    # 策略5: 截断 JSON 的安全回退（尝试补全）
     repaired = _repair_truncated(text)
     if repaired:
         try:
@@ -68,12 +68,12 @@ def safe_json_parse(text: str, default: Any = None) -> Any:
         except json.JSONDecodeError:
             pass
 
-    logger.warning(f"JSON parsing failed, returning default. First 100 chars of raw text: {text[:100]}")
+    logger.warning(f"JSON 解析失败，返回默认值。原始文本前100字符: {text[:100]}")
     return default
 
 
 def _extract_code_block(text: str) -> str | None:
-    """Extract a ```json ... ``` or ``` ... ``` code block."""
+    """提取 ```json ... ``` 或 ``` ... ``` 代码块"""
     patterns = [
         r'```(?:json)?\s*\n?(.*?)\n?```',
         r'```(?:json)?\s*(.*?)```',
@@ -86,8 +86,8 @@ def _extract_code_block(text: str) -> str | None:
 
 
 def _extract_json_object(text: str) -> str | None:
-    """Extract the first complete JSON object or array."""
-    # Find the first { or [
+    """提取第一个完整的 JSON 对象或数组"""
+    # 找第一个 { 或 [
     start_idx = -1
     for i, c in enumerate(text):
         if c in '{[':
@@ -97,7 +97,7 @@ def _extract_json_object(text: str) -> str | None:
     if start_idx == -1:
         return None
 
-    # Match brackets starting from start_idx
+    # 从 start_idx 开始匹配括号
     bracket = text[start_idx]
     close_bracket = '}' if bracket == '{' else ']'
     depth = 0
@@ -133,28 +133,28 @@ def _extract_json_object(text: str) -> str | None:
 
 
 def _fix_common_issues(json_str: str) -> str:
-    """Fix common JSON format issues."""
-    # Remove trailing commas
+    """修复常见 JSON 格式问题"""
+    # 移除尾逗号
     fixed = re.sub(r",\s*([}\]])", r"\1", json_str)
-    # Single quotes -> double quotes (replace across the whole string)
+    # 单引号 → 双引号（整个字符串替换）
     if "'" in fixed:
-        # Safe replacement: only replace when quotes are paired
+        # 安全替换：只在引号成对出现时替换
         fixed = fixed.replace("'", '"')
     return fixed
 
 
 def _repair_truncated(text: str) -> str | None:
-    """Attempt to repair truncated JSON."""
-    # Count unclosed brackets
+    """尝试修复被截断的 JSON"""
+    # 计算未闭合的括号
     open_braces = text.count("{") - text.count("}")
     open_brackets = text.count("[") - text.count("]")
     
     if open_braces > 0 or open_brackets > 0:
-        # Remove the last incomplete comma
+        # 移除最后一个不完整的逗号
         repaired = text.rstrip()
         if repaired.endswith(","):
             repaired = repaired[:-1]
-        # Close brackets
+        # 补全括号
         repaired += "]" * max(open_brackets, 0)
         repaired += "}" * max(open_braces, 0)
         return repaired

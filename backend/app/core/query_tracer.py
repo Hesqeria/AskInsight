@@ -1,13 +1,13 @@
-"""Query lifecycle tracer (Vanna #176 lesson: missing log observability).
+"""查询生命周期追踪器（Vanna #176 教训：缺少日志可观测性）
 
-Records per query:
-  - elapsed time per stage
-  - recall hit count
-  - SQL generation details
-  - execution result
-  - error information
+记录每个查询的：
+  - 每个阶段耗时
+  - 召回命中数
+  - SQL 生成详情
+  - 执行结果
+  - 错误信息
 
-Outputs JSON-formatted logs for downstream analysis and monitoring.
+输出 JSON 格式到日志，便于后续分析和监控。
 """
 import time
 import json
@@ -16,7 +16,7 @@ from app.core.log import logger
 
 
 class QueryTrace:
-    """Trace record for a single query."""
+    """单次查询的追踪记录"""
 
     def __init__(self, query: str, request_id: str):
         self.query = query
@@ -27,12 +27,12 @@ class QueryTrace:
         self._current_stage: str | None = None
 
     def start_stage(self, name: str):
-        """Start recording a stage."""
+        """开始记录一个阶段"""
         self._stage_start = time.time()
         self._current_stage = name
 
     def end_stage(self, name: str, detail: dict | None = None):
-        """End a stage."""
+        """结束一个阶段"""
         if self._stage_start is None:
             return
         elapsed = round((time.time() - self._stage_start) * 1000, 1)
@@ -47,7 +47,7 @@ class QueryTrace:
         self._current_stage = None
 
     def finish(self, result_summary: str, success: bool = True):
-        """Query finished, output the full trace."""
+        """查询完成，输出完整追踪"""
         total_elapsed = round((time.time() - self.start_time) * 1000, 1)
         slowest = max(self.stages, key=lambda s: s["elapsed_ms"]) if self.stages else None
 
@@ -72,24 +72,24 @@ class QueryTrace:
         return summary
 
 
-# Global trace instance (a new one is created per request)
+# 全局追踪实例（每次请求创建新的）
 _current_trace: QueryTrace | None = None
 
 
 def start_trace(query: str, request_id: str) -> QueryTrace:
-    """Start tracing a query."""
+    """开始追踪一次查询"""
     global _current_trace
     _current_trace = QueryTrace(query, request_id)
     return _current_trace
 
 
 def get_trace() -> QueryTrace | None:
-    """Get the current trace instance."""
+    """获取当前追踪实例"""
     return _current_trace
 
 
 def trace_stage(name: str):
-    """Decorator: automatically record node timing."""
+    """装饰器：自动记录节点耗时"""
     def decorator(func):
         async def wrapper(*args, **kwargs):
             trace = get_trace()
