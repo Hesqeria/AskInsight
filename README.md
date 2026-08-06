@@ -1,8 +1,11 @@
 # AskInsight — AI-Powered Data Insight Agent
+[English](README.md) | [中文](docs/README_CN.md) | [日本語](docs/README_JP.md)
+
 
 [![CI](https://github.com/your-org/askinsight/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
+[![Lang](https://img.shields.io/badge/lang-EN_%7C_CN-blue)]
 [![Vue](https://img.shields.io/badge/vue-3.5-42b883.svg)](https://vuejs.org/)]
 
 > Enterprise-grade NL2SQL intelligent data-query system — 25-node LangGraph workflow + Vue 3 frontend.
