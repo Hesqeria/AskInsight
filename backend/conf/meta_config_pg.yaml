@@ -1,0 +1,50 @@
+tables:
+  - name: dim_customer
+    role: dimension
+    description: Customer dimension table.
+    columns:
+      - {name: customer_id, type: VARCHAR, role: primary_key, description: Customer ID., alias: ["客户", "客户ID", "customer"]}
+      - {name: customer_name, type: VARCHAR, role: dimension, description: Customer name., alias: ["客户名", "姓名", "customer_name"]}
+      - {name: gender, type: VARCHAR, role: dimension, description: Gender (M:Male F:Female)., alias: ["性别", "gender"]}
+      - {name: member_level, type: VARCHAR, role: dimension, description: Membership level (1:Regular 2:Silver 3:Gold 4:Diamond)., alias: ["等级", "会员", "member_level"]}
+
+  - name: dim_product
+    role: dimension
+    description: Product dimension table.
+    columns:
+      - {name: product_id, type: VARCHAR, role: primary_key, description: Product ID., alias: ["产品", "商品", "product"]}
+      - {name: product_name, type: VARCHAR, role: dimension, description: Product name., alias: ["产品名", "商品名", "product_name"]}
+      - {name: category, type: VARCHAR, role: dimension, description: Product category., alias: ["类别", "品类", "category"]}
+      - {name: brand, type: VARCHAR, role: dimension, description: Brand., alias: ["品牌", "商标", "brand"]}
+
+  - name: dim_region
+    role: dimension
+    description: Region dimension table.
+    columns:
+      - {name: region_id, type: VARCHAR, role: primary_key, description: Region ID., alias: []}
+      - {name: province, type: VARCHAR, role: dimension, description: Province., alias: ["省", "省份", "province"]}
+      - {name: region_name, type: VARCHAR, role: dimension, description: Macro-region (East/South/North China, etc.)., alias: ["大区", "地区", "区域", "region"]}
+      - {name: country, type: VARCHAR, role: dimension, description: Country., alias: ["国家", "country"]}
+
+  - name: dim_date
+    role: dimension
+    description: Date dimension table.
+    columns:
+      - {name: date_id, type: INT, role: primary_key, description: Date ID (yyyyMMdd)., alias: ["日期ID", "date_id"]}
+      - {name: year, type: INT, role: dimension, description: Year., alias: ["年", "year"]}
+      - {name: quarter, type: VARCHAR, role: dimension, description: Quarter (Q1/Q2/Q3/Q4)., alias: ["季度", "quarter"]}
+      - {name: month, type: INT, role: dimension, description: Month., alias: ["月", "月份", "month"]}
+      - {name: day, type: INT, role: dimension, description: Day., alias: ["日", "day"]}
+      - {name: weekday, type: VARCHAR, role: dimension, description: Weekday., alias: ["星期", "周几", "weekday"]}
+
+  - name: fact_order
+    role: fact
+    description: Order fact table (caliber: includes orders in all statuses, including unpaid).
+    columns:
+      - {name: order_id, type: VARCHAR, role: primary_key, description: Order ID., alias: ["订单", "order"]}
+      - {name: customer_id, type: VARCHAR, role: foreign_key, description: Foreign key linking to customer., alias: ["客户", "customer"]}
+      - {name: product_id, type: VARCHAR, role: foreign_key, description: Foreign key linking to product., alias: ["产品", "product"]}
+      - {name: date_id, type: INT, role: foreign_key, description: Foreign key linking to date., alias: ["日期", "date"]}
+      - {name: region_id, type: VARCHAR, role: foreign_key, description: Foreign key linking to region., alias: ["地区", "region"]}
+      - {name: order_quantity, type: INT, role: measure, description: Order quantity (caliber: units ordered)., alias: ["数量", "销量", "order_quantity"]}
+      - {name: order_amount, type: FLOAT, role: measure, description: Order amount (caliber: tax-inclusive GMV, including unpaid)., alias: ["金额", "销售额", "GMV", "order_amount"]}

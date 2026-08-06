@@ -1,0 +1,31 @@
+[project]
+name = "data-agent-v3"
+version = "0.1.0"
+description = "Shopkeeper Data Query v3 (Doris + Milvus + TEI)"
+requires-python = ">=3.11"
+dependencies = [
+    "asyncmy>=0.2.11",
+    "cryptography>=46.0.6",
+    "fastapi[standard]>=0.135.2",
+    "huggingface-hub>=1.8.0",
+    "jieba>=0.42.1",
+    "langchain>=1.2.14",
+    "langchain-deepseek>=1.0.1",
+    "langchain-huggingface>=1.2.1",
+    "langgraph>=1.1.4",
+    "loguru>=0.7.3",
+    "omegaconf>=2.3.0",
+    "pyyaml>=6.0.3",
+    "pymilvus>=2.4.0",
+    "sqlalchemy>=2.0.48",
+    "pydantic-settings>=2.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+    "boundary: boundary tests",
+    "integration: integration tests (require external services)",
+    "unit: unit tests",
+]

@@ -1,0 +1,104 @@
+tables:
+  - name: dim_region
+    role: dim
+    description: Region dimension table; describes the geographic area where an order was placed.
+    columns:
+      - {name: region_id, role: primary_key, description: Unique identifier of the region., alias: ["地区ID", "区域ID", "region_id"], sync: false}
+      - {name: province, role: dimension, description: Province where the order was placed., alias: ["省份", "省", "所在省份", "province"], sync: true}
+      - {name: region_name, role: dimension, description: Name of the macro-region, e.g. North China, East China., alias: ["地区", "区域", "大区", "region"], sync: true}
+      - {name: country, role: dimension, description: Country to which the region belongs., alias: ["国家", "国家名称", "country"], sync: true}
+
+  - name: dim_customer
+    role: dim
+    description: Customer dimension table; describes the basic attributes of the ordering customer.
+    columns:
+      - {name: customer_id, role: primary_key, description: Unique identifier of the customer., alias: ["客户ID", "用户ID", "customer_id"], sync: false}
+      - {name: customer_name, role: dimension, description: Customer name., alias: ["客户名称", "用户名称", "customer_name"], sync: true}
+      - {name: gender, role: dimension, description: Customer gender., alias: ["性别", "gender"], sync: true}
+      - {name: member_level, role: dimension, description: Customer membership level., alias: ["会员等级", "用户等级", "member_level"], sync: true}
+
+  - name: dim_product
+    role: dim
+    description: Product dimension table; describes the basic attributes of products.
+    columns:
+      - {name: product_id, role: primary_key, description: Unique identifier of the product., alias: ["商品ID", "产品ID", "product_id"], sync: false}
+      - {name: product_name, role: dimension, description: Product name., alias: ["商品名称", "产品名称", "product_name"], sync: true}
+      - {name: category, role: dimension, description: Product category., alias: ["商品类别", "品类", "分类", "category"], sync: true}
+      - {name: brand, role: dimension, description: Product brand name., alias: ["品牌", "品牌名称", "brand"], sync: true}
+
+  - name: dim_date
+    role: dim
+    description: Date dimension table; supports multi-granularity time analysis.
+    columns:
+      - {name: date_id, role: primary_key, description: Unique identifier of the date in yyyyMMdd format., alias: ["日期ID", "日期", "date_id"], sync: false}
+      - {name: year, role: dimension, description: Year., alias: ["年", "年份", "year"], sync: false}
+      - {name: quarter, role: dimension, description: Quarter., alias: ["季度", "quarter"], sync: true}
+      - {name: month, role: dimension, description: Month., alias: ["月", "月份", "month"], sync: false}
+      - {name: day, role: dimension, description: Day., alias: ["日", "天", "day"], sync: false}
+
+  - name: fact_order
+    role: fact
+    description: Order fact table; records core metrics such as order quantity and amount.
+    columns:
+      - {name: order_id, role: primary_key, description: Unique identifier of the order., alias: ["订单ID", "order_id"], sync: false}
+      - {name: customer_id, role: foreign_key, description: Foreign key linking to the customer dimension., alias: ["客户ID", "用户ID", "customer_id"], sync: false}
+      - {name: product_id, role: foreign_key, description: Foreign key linking to the product dimension., alias: ["商品ID", "产品ID", "product_id"], sync: false}
+      - {name: date_id, role: foreign_key, description: Foreign key linking to the date dimension., alias: ["日期", "下单日期", "date_id"], sync: false}
+      - {name: region_id, role: foreign_key, description: Foreign key linking to the region dimension., alias: ["地区ID", "区域ID", "region_id"], sync: false}
+      - {name: order_quantity, role: measure, description: Quantity of products purchased in the order., alias: ["销量", "购买数量", "件数", "order_quantity"], sync: false}
+      - {name: order_amount, role: measure, description: Order amount., alias: ["销售额", "订单金额", "收入", "order_amount"], sync: false}
+
+  - name: ads_customer_profile
+    role: dim
+    description: ADS customer profile tag table; includes RFM segment, consumption preferences, lifecycle stage, price sensitivity and other tags.
+    columns:
+      - {name: customer_id, role: primary_key, description: Customer ID., alias: ["客户ID", "customer_id"], sync: false}
+      - {name: customer_name, role: dimension, description: Customer name., alias: ["客户名称", "用户名称", "customer_name"], sync: true}
+      - {name: member_level, role: dimension, description: Membership level., alias: ["会员等级", "member_level"], sync: true}
+      - {name: total_orders, role: measure, description: Total number of orders., alias: ["订单数", "购买次数", "total_orders"], sync: false}
+      - {name: total_amount, role: measure, description: Total spending amount., alias: ["消费总额", "总金额", "total_amount"], sync: false}
+      - {name: avg_order_amount, role: measure, description: Average order amount., alias: ["客单价", "平均消费", "avg_order_amount"], sync: false}
+      - {name: preferred_category, role: dimension, description: Preferred product category., alias: ["喜好品类", "常买品类", "preferred_category"], sync: true}
+      - {name: preferred_brand, role: dimension, description: Preferred brand., alias: ["喜好品牌", "常买品牌", "preferred_brand"], sync: true}
+      - {name: preferred_region, role: dimension, description: Preferred region., alias: ["常买地区", "preferred_region"], sync: true}
+      - {name: rfm_segment, role: dimension, description: RFM customer segment., alias: ["客户分群", "RFM分群", "rfm_segment"], sync: true}
+      - {name: is_high_value, role: dimension, description: Whether the customer is high-value (TRUE means high-value; query with WHERE is_high_value = TRUE)., alias: ["高价值", "VIP", "高价值客户", "high_value"], sync: true}
+      - {name: is_churn_risk, role: dimension, description: Whether the customer is at churn risk (TRUE means at risk; query with WHERE is_churn_risk = TRUE)., alias: ["流失", "流失风险", "流失客户", "churn_risk"], sync: true}
+      - {name: lifecycle_stage, role: dimension, description: Lifecycle stage., alias: ["生命周期", "客户阶段", "lifecycle_stage"], sync: true}
+      - {name: price_sensitivity, role: dimension, description: Price sensitivity., alias: ["价格敏感", "敏感度", "price_sensitivity"], sync: true}
+      - {name: purchase_frequency, role: dimension, description: Purchase frequency., alias: ["频率", "购买频次", "purchase_frequency"], sync: true}
+      - {name: brand_loyalty_score, role: measure, description: Brand loyalty score., alias: ["忠诚度", "品牌忠诚", "brand_loyalty"], sync: false}
+
+  - name: dws_sales_wide
+    role: fact
+    description: DWS sales wide table; aggregates across date/region/customer/product dimensions.
+    columns:
+      - {name: date_id, role: foreign_key, description: Date ID., alias: ["日期", "date_id"], sync: false}
+      - {name: region_name, role: dimension, description: Region name., alias: ["地区", "大区", "region"], sync: true}
+      - {name: customer_name, role: dimension, description: Customer name., alias: ["客户", "customer"], sync: true}
+      - {name: category, role: dimension, description: Product category., alias: ["品类", "类别", "category"], sync: true}
+      - {name: brand, role: dimension, description: Brand., alias: ["品牌", "brand"], sync: true}
+      - {name: total_amount, role: measure, description: Total sales amount., alias: ["销售额", "金额", "total_amount"], sync: false}
+      - {name: total_quantity, role: measure, description: Sales quantity., alias: ["销量", "件数", "total_quantity"], sync: false}
+      - {name: order_count, role: measure, description: Order count., alias: ["订单数", "order_count"], sync: false}
+
+  - name: dws_region_summary
+    role: dim
+    description: DWS region summary table; includes total orders/total amount/avg order value/customer count/category count/top category.
+    columns:
+      - {name: region_name, role: primary_key, description: Region name., alias: ["地区", "大区", "region"], sync: true}
+      - {name: total_orders, role: measure, description: Total order count., alias: ["订单数", "total_orders"], sync: false}
+      - {name: total_amount, role: measure, description: Total sales amount., alias: ["销售额", "total_amount"], sync: false}
+      - {name: avg_order_amount, role: measure, description: Average order value (AOV)., alias: ["平均订单金额", "avg_order_amount"], sync: false}
+      - {name: unique_customers, role: measure, description: Customer count., alias: ["客户数", "用户数", "unique_customers"], sync: false}
+      - {name: top_category, role: dimension, description: Top product category., alias: ["热门品类", "主要品类", "top_category"], sync: true}
+
+metrics:
+  - name: GMV
+    description: Gross Merchandise Value; the sum of transaction amounts across all orders.
+    relevant_columns: [fact_order.order_amount]
+    alias: ["成交总额", "订单总额", "gross_merchandise_value"]
+  - name: AOV
+    description: Average Order Value; the average transaction amount across all orders.
+    relevant_columns: [fact_order.order_amount]
+    alias: ["平均单价", "平均订单金额", "average_order_value"]

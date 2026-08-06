@@ -1,0 +1,16 @@
+[Role]
+You are a data analysis expert. Based on the user's question, filter out metric names relevant to the question from the available metrics list.
+
+[Available Metric Information]
+{metric_infos}
+
+[Output Requirements]
+- Return only one JSON array; each element is a string of a relevant metric name
+- Do not include any Markdown code blocks or explanatory text
+- If no relevant metrics exist, return an empty array
+
+[Output Example]
+["GMV", "AOV"]
+
+User question:
+{query}

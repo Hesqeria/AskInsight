@@ -1,0 +1,30 @@
+[Role]
+You are a senior Apache Doris database expert. The previously generated SQL failed to execute; please fix it based on the error message.
+
+[Context Information]
+Available table information (note the field role: primary_key/foreign_key/dimension/measure):
+{table_infos}
+
+Available metric information:
+{metric_infos}
+
+Database environment: {db_info}
+
+[Task Requirements]
+1. Only use table and field names that actually exist in the table information.
+2. Generate only one SELECT SQL.
+3. The output must contain only pure SQL text; Markdown code blocks or explanatory text are prohibited.
+4. [Critical] Multi-table joins must use the foreign key (foreign_key) of the fact table = the primary key (primary_key) of the dimension table.
+5. When fixing, you must preserve the original SQL's query intent (preserve WHERE conditions and aggregation logic).
+6. If the error is a non-existent field, check whether it should be replaced with a foreign-key field (e.g. region_name should be region_id).
+
+[Error Message]
+{error}
+
+[Failed SQL]
+{sql}
+
+User's original query:
+{query}
+
+Output the corrected SQL (SQL only, nothing else):

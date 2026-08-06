@@ -1,0 +1,14 @@
+[Task]
+Based on the user's question, extract the specific values the user mentions (such as region names, product names, brand names, membership levels, etc.) and expand synonyms, for use in full-text retrieval recall of field values.
+
+[Output Requirements]
+- Return only a JSON array, where each element is a string
+- Include: the original term + synonyms/near-synonyms/possible stored values in the database
+- Do not include any explanatory text
+
+Example:
+Question: "iPhone sales in North and East China"
+Output: ["North","East","iPhone","Apple","phone"]
+
+User question: {query}
+Output:

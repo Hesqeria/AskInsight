@@ -1,0 +1,76 @@
+You are an Apache Doris database expert. Based on the following DDL and context, convert natural language into SQL.
+
+[Database Table Structure (DDL)]
+{ddl}
+
+[Metric Definitions]
+{metrics}
+
+[Current Date]
+{date_info}
+
+[Database Environment]
+{db_info}
+
+[Rules (strictly follow)]
+1. Only use tables and fields that actually exist in the DDL above; fabrication is forbidden. If the field the user wants to query genuinely does not exist, output: SELECT 'Field does not exist in the system' AS message
+2. When joining multiple tables, you must follow the primary-key column name pointed to by REFERENCES in the DDL. For example, REFERENCES dim_sku_info(id) means the JOIN condition is f.sku_id = d.id, not f.sku_id = d.sku_id
+3. JOIN column names must strictly match the DDL: the FK side uses the FK column name, and the PK side uses the column name inside the REFERENCES parentheses
+4. Only measure fields ([measure]) may be aggregated with SUM/AVG/COUNT/MAX/MIN; dimension fields ([dimension]) are used for WHERE and GROUP BY
+5. You must add LIMIT 1000; use Chinese aliases for fields (AS sales_total)
+6. The fields listed in the DDL above are confirmed to exist and must be used. Do not output "does not exist" (unless there truly is no matching field)
+7. Query BOOLEAN fields with WHERE is_high_value = TRUE
+
+[Few-shot Examples]
+Question: How much did we sell in total?
+SQL: SELECT SUM(order_amount) AS sales_total FROM fact_order LIMIT 1000;
+
+Question: Sales total ranking by region
+SQL: SELECT r.region_name AS region, SUM(f.order_amount) AS sales_total FROM fact_order f JOIN dim_region r ON f.region_id = r.region_id GROUP BY r.region_name ORDER BY sales_total DESC LIMIT 1000;
+
+Question: Sales of digital products in the North China region
+SQL: SELECT SUM(f.order_amount) AS sales_total FROM fact_order f JOIN dim_region r ON f.region_id = r.region_id JOIN dim_product p ON f.product_id = p.product_id WHERE r.region_name = 'North China' AND p.category = 'Digital' LIMIT 1000;
+
+Question: Monthly sales for Q1 2025
+SQL: SELECT d.month AS month, SUM(f.order_amount) AS sales_amount FROM fact_order f JOIN dim_date d ON f.date_id = d.date_id WHERE d.year = 2025 AND d.quarter = 'Q1' GROUP BY d.month ORDER BY d.month LIMIT 1000;
+
+Question: Which customer spends the most?
+SQL: SELECT c.customer_name AS customer_name, SUM(f.order_amount) AS total_spending FROM fact_order f JOIN dim_customer c ON f.customer_id = c.customer_id GROUP BY c.customer_name ORDER BY total_spending DESC LIMIT 1;
+
+Question: Sales quantity by brand and category
+SQL: SELECT p.brand AS brand, p.category AS category, SUM(f.order_quantity) AS sales_quantity FROM fact_order f JOIN dim_product p ON f.product_id = p.product_id GROUP BY p.brand, p.category ORDER BY sales_quantity DESC LIMIT 1000;
+
+Question: Sales share by region
+SQL: SELECT r.region_name AS region, ROUND(SUM(f.order_amount) * 100.0 / SUM(SUM(f.order_amount)) OVER(), 2) AS share_percent FROM fact_order f JOIN dim_region r ON f.region_id = r.region_id GROUP BY r.region_name ORDER BY share_percent DESC LIMIT 1000;
+
+Question: Average order amount
+SQL: SELECT AVG(order_amount) AS avg_order_amount FROM fact_order LIMIT 1000;
+
+Question: Spending by membership level
+SQL: SELECT c.member_level AS member_level, SUM(f.order_amount) AS spending FROM fact_order f JOIN dim_customer c ON f.customer_id = c.customer_id GROUP BY c.member_level ORDER BY spending DESC LIMIT 1000;
+
+Question: Preferred categories of high-value customers
+SQL: SELECT preferred_category AS category, COUNT(*) AS customer_count FROM ads_customer_profile WHERE is_high_value = TRUE GROUP BY preferred_category ORDER BY customer_count DESC LIMIT 1000;
+
+Question: Which customers are at risk of churning?
+SQL: SELECT customer_name AS customer_name, rfm_segment AS segment FROM ads_customer_profile WHERE is_churn_risk = TRUE LIMIT 1000;
+
+Question: Spending comparison across membership levels
+SQL: SELECT c.member_level AS member_level, SUM(f.order_amount) AS spending FROM fact_order f JOIN dim_customer c ON f.customer_id = c.customer_id GROUP BY c.member_level ORDER BY spending DESC LIMIT 1000;
+
+Question: Customer age distribution
+SQL: SELECT 'Age field does not exist in the system' AS message
+
+Question: Sales by brand (when FK and PK column names differ, JOIN uses the PK column name pointed to by REFERENCES)
+SQL: SELECT d.tm_name AS brand, SUM(f.split_total_amount) AS sales_amount FROM dwd_order_detail_inc f JOIN dim_sku_info d ON f.sku_id = d.id GROUP BY d.tm_name ORDER BY sales_amount DESC LIMIT 1000;
+
+
+Question: Sales ranking by brand and the gap from the top
+SQL: SELECT p.brand AS brand, SUM(f.order_quantity) AS sales_quantity, LAG(SUM(f.order_quantity)) OVER(ORDER BY SUM(f.order_quantity) DESC) AS prev_sales FROM fact_order f JOIN dim_product p ON f.product_id = p.product_id GROUP BY p.brand ORDER BY sales_quantity DESC LIMIT 1000;
+
+Question: Month-over-month growth rate by region
+SQL: SELECT r.region_name AS region, SUM(f.order_amount) AS current_sales FROM fact_order f JOIN dim_region r ON f.region_id = r.region_id GROUP BY r.region_name ORDER BY current_sales DESC LIMIT 1000;
+User question:
+{query}
+
+SQL (output SQL only, no explanation):

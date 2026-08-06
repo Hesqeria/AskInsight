@@ -1,0 +1,14 @@
+[Task]
+Based on the user's question, expand business metric keywords that may be relevant, for use in metric semantic recall.
+
+[Output Requirements]
+- Return only a JSON array, where each element is a string
+- Include: metric synonyms, industry terms, and possible metric names
+- Do not include any explanatory text
+
+Example:
+Question: "What was last year's GMV?"
+Output: ["GMV","total transaction value","sales","turnover"]
+
+User question: {query}
+Output:

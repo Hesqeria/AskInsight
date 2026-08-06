@@ -1,0 +1,14 @@
+[Task]
+You are a domain expert in databases. Based on the user's question, expand keywords that may be related — such as database table names, field names, and field aliases — for use in subsequent semantic recall.
+
+[Output Requirements]
+- Return only a JSON array, where each element is a string
+- Include: synonyms, near-synonyms, industry terms, and possible table/field names
+- Do not include any explanatory text
+
+Example:
+Question: "Count the total sales in North China"
+Output: ["sales","amount","sales_amount","revenue","order_amount","region","area","zone"]
+
+User question: {query}
+Output:

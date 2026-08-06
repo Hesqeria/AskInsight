@@ -1,0 +1,43 @@
+logging:
+  file:
+    enable: true
+    level: INFO
+    path: logs
+    rotation: "10 MB"
+    retention: "7 days"
+  console:
+    enable: true
+    level: INFO
+
+doris:
+  host: ${oc.env:DORIS_HOST, 127.0.0.1}
+  port: 9030
+  user: root
+  password: ${oc.env:DORIS_PASSWORD}
+  database: dw
+
+milvus:
+  host: ${oc.env:MILVUS_HOST, 127.0.0.1}
+  port: 19530
+  user: root
+  password: ${oc.env:MILVUS_PASSWORD}
+  embedding_size: 1024
+  column_collection: data_agent_column
+  metric_collection: data_agent_metric
+
+embedding:
+  api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+  api_key: ${oc.env:EMBEDDING_API_KEY}
+  model: text-embedding-v3
+
+llm:
+  model_name: ${oc.env:LLM_MODEL_NAME}
+  api_key: ${oc.env:LLM_API_KEY}
+  base_url: ${oc.env:LLM_BASE_URL}
+
+pg:
+  host: ${oc.env:PG_HOST, 127.0.0.1}
+  port: 5432
+  user: app
+  password: ${oc.env:PG_PASSWORD}
+  database: app
