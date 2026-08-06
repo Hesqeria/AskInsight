@@ -8,7 +8,7 @@
 [![Lang](https://img.shields.io/badge/lang-EN_%7C_CN-blue)]
 [![Vue](https://img.shields.io/badge/vue-3.5-42b883.svg)](https://vuejs.org/)]
 
-> Enterprise-grade NL2SQL intelligent data-query system — 25-node LangGraph workflow + Vue 3 frontend.
+> Enterprise-grade NL2SQL intelligent data-query system — 24-node LangGraph workflow + Vue 3 frontend.
 
 Converts natural-language queries into SQL, executes them automatically, and visualizes the results. Built specifically for Apache Doris data warehouses; supports Milvus vector retrieval + Redis caching.
 
@@ -18,7 +18,7 @@ Converts natural-language queries into SQL, executes them automatically, and vis
 
 | Module | Capability |
 |------|------|
-| **NL2SQL Engine** | 25-node workflow, 93.3% enterprise warehouse pass rate, 3-candidate SQL voting |
+| **NL2SQL Engine** | 24-node workflow, 93.3% enterprise warehouse pass rate, 3-candidate SQL voting |
 | **FK→PK Inference** | Auto-detect foreign-key relationships to generate REFERENCES, no manual annotation needed |
 | **RRF Three-way Fusion** | Field + metric + dimension-value three-way recall, k=60 Reciprocal Rank Fusion |
 | **Complexity Tiers** | SQL scoring routes: simple = fully automatic / medium = validated / complex = degraded |
@@ -101,7 +101,7 @@ npm run dev  # http://localhost:5173
 intelligent-decision-analytics/
 ├── backend/                    # Python backend
 │   ├── app/
-│   │   ├── agent/              # LangGraph 25 nodes
+│   │   ├── agent/              # LangGraph 24 nodes
 │   │   │   ├── graph.py        # Graph definition
 │   │   │   ├── nodes/          # Node implementations
 │   │   │   └── state.py        # State definition

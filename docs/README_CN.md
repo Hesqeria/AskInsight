@@ -12,7 +12,7 @@
 
 | 模块 | 能力 |
 |------|------|
-| **NL2SQL 引擎** | 26 节点 LangGraph 工作流，93.3% 企业数仓通过率 |
+| **NL2SQL 引擎** | 24 节点 LangGraph 工作流，93.3% 企业数仓通过率 |
 | **FK→PK 智能推断** | 自动识别外键关系，无需手工标注 |
 | **RRF 三路融合召回** | 字段 + 指标 + 维度值检索，k=60 |
 | **复杂度分级路由** | 3 级 SQL 评分：全自动 / 校验 / 降级 |
@@ -62,7 +62,7 @@ make init                   # 初始化知识库
 ```
 AskInsight/
 ├── backend/               # Python 后端
-│   ├── app/agent/         # 26 节点 LangGraph
+│   ├── app/agent/         # 24 节点 LangGraph
 │   ├── app/api/           # FastAPI 路由(9个)
 │   ├── app/core/          # 安全/审计/方言/准入
 │   └── prompts/           # 7 个 LLM 提示词

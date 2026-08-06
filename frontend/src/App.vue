@@ -81,8 +81,7 @@ function cellStyle(msg,row,col){var val=row[col];if(typeof val!=="number")return
 
 async function rateAnswer(msgIndex,rating){try{var reqId=""+Date.now();await fetch("/api/quality/rate",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(localStorage.getItem("token")||"")},body:JSON.stringify({request_id:reqId,rating:rating})});var btn=rating===1?"Rate good":"Rate feedback";alert(btn)}catch(e){alert("Rating failed")}}
 
-function exportCSV(msg){var cols=msg.columns;var lines=[cols.join(",")];msg.rows.forEach(function(r){lines.push(cols.map(function(c){return JSON.stringify(r[c]||"")}).join(","))});var blob=new Blob(["\uFEFF"+lines.join("
-")],{type:"text/csv;charset=utf-8"});var url=URL.createObjectURL(blob);var a=document.createElement("a");a.href=url;a.download="result.csv";a.click();URL.revokeObjectURL(url)}
+ function exportCSV(msg){var cols=msg.columns;var lines=[cols.join(",")];msg.rows.forEach(function(r){lines.push(cols.map(function(c){return JSON.stringify(r[c]||"")}).join(","))});var blob=new Blob(["\uFEFF"+lines.join("\n")],{type:"text/csv;charset=utf-8"});var url=URL.createObjectURL(blob);var a=document.createElement("a");a.href=url;a.download="result.csv";a.click();URL.revokeObjectURL(url)}
 
 function scrollToBottom() {
   const el = messagesEl.value;

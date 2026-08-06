@@ -2,7 +2,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from dotenv import load_dotenv  # noqa: E402
 from pathlib import Path as _Path
-load_dotenv(_Path(__file__).parents[2] / ".env")  # noqa: E402
+_PROJECT_ROOT = _Path(__file__).parents[3]  # AskInsight/
+_BACKEND_ROOT = _Path(__file__).parents[2]  # backend/
+# Root .env is the canonical source (docker-compose); backend/.env is a local-dev fallback.
+# Existing environment variables always win (no override).
+load_dotenv(_PROJECT_ROOT / ".env")
+load_dotenv(_BACKEND_ROOT / ".env")
 from omegaconf import OmegaConf  # noqa: E402
 
 
