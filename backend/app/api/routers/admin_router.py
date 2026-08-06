@@ -171,3 +171,21 @@ async def discover_schema(db_name: str = "dw", user: dict = Depends(verify_token
     except Exception as e:
         logger.error(f"Schema discovery failed: {e}")
         return {"status": "error", "message": str(e)}
+
+@admin_router.post("/api/admin/fewshot/generate")
+async def generate_fewshot(user: dict = Depends(verify_token)):
+    """Generate few-shot SQL examples from current meta_config."""
+    from app.scripts.fewshot_generator import generate_fewshot_from_config, format_fewshot_prompt
+    try:
+        examples = generate_fewshot_from_config(
+            config_path="conf/meta_config_dw.yaml"
+        )
+        prompt_text = format_fewshot_prompt(examples)
+        return {
+            "status": "ok",
+            "count": len(examples),
+            "examples": examples,
+            "prompt_text": prompt_text,
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
