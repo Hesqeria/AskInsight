@@ -1,16 +1,18 @@
 """Python code execution node: run data analysis code in a secure subprocess
 
 Security measures:
-  - subprocess + timeout（30s）
+  - subprocess + timeout (30s)
   - restricted module whitelist (no os/subprocess/socket)
-  - memory limit (optional)
-  - no network access
+  - data passed via temp file (no f-string injection)
+  - AST-based code validation
+  - injection pattern detection
 
 Input: state["_last_result"] (query result)
 Output: execution result (chart/table/text)
 """
 import ast
 import json
+import os
 import subprocess
 import sys
 from langgraph.runtime import Runtime
@@ -23,25 +25,32 @@ from app.core.path_guard import safe_temp_path
 from langchain_core.messages import HumanMessage
 
 
-# Allowed Python module whitelist
 ALLOWED_MODULES = {
     "pandas", "numpy", "math", "statistics", "json", "datetime",
     "collections", "itertools", "functools", "operator",
 }
 
-# Forbidden modules/functions
 FORBIDDEN_IMPORTS = {"os", "subprocess", "socket", "shutil", "pty", "threading", "multiprocessing"}
 
+# Patterns that indicate injection attempts in LLM-generated code
+INJECTION_PATTERNS = [
+    "'''", '"""', "__import__(", "compile(", "exec(", "eval(",
+    "importlib", "builtins", "getattr(",
+]
 
-def validate_code(code: str) -> tuple[bool, str]:
-    """Security check for Python code"""
+
+def validate_code(code: str) -> tuple:
+    """Security check for Python code via AST + pattern scanning."""
+    for pattern in INJECTION_PATTERNS:
+        if pattern in code:
+            return False, f"Injection pattern detected: {repr(pattern)}"
+
     try:
         tree = ast.parse(code)
     except SyntaxError as e:
         return False, f"Syntax error: {e}"
 
     for node in ast.walk(tree):
-        # Check imports
         if isinstance(node, ast.Import):
             for alias in node.names:
                 mod = alias.name.split(".")[0]
@@ -51,23 +60,24 @@ def validate_code(code: str) -> tuple[bool, str]:
             mod = (node.module or "").split(".")[0]
             if mod in FORBIDDEN_IMPORTS:
                 return False, f"Forbidden module import: {mod}"
-        # Check for dangerous function calls
         if isinstance(node, ast.Call):
             func = node.func
             if isinstance(func, ast.Attribute):
                 if func.attr in ("system", "popen", "exec", "eval", "open"):
-                    if isinstance(func.value, ast.Name) and func.value.id == "os":
-                        return False, f"Forbidden call to os.{func.attr}"
+                    if isinstance(func.value, ast.Name):
+                        if func.value.id in ("os", "subprocess"):
+                            return False, f"Forbidden call to {func.value.id}.{func.attr}"
+
     return True, "OK"
 
 
 async def code_executor(state: DataAgentState, runtime: Runtime[DataAgentContext]):
-    """Python code execution node
+    """Python code execution node.
 
     Flow:
       1. LLM generates Python analysis code based on query results
-      2. Security check
-      3. Subprocess execution (30s timeout)
+      2. Security check (AST + injection patterns)
+      3. Subprocess execution (30s timeout) with data via temp file
       4. Return result
     """
     writer = runtime.stream_writer
@@ -79,7 +89,6 @@ async def code_executor(state: DataAgentState, runtime: Runtime[DataAgentContext
         if not data or not isinstance(data, list):
             return {"code_result": None}
 
-        # 1. LLM generates Python code
         data_str = json.dumps(data[:20], ensure_ascii=False, default=str)
         prompt = f"""You are a data analyst. Generate Python analysis code based on the following data.
 
@@ -90,8 +99,7 @@ Requirements:
 1. Use pandas to process data
 2. Only use pandas/numpy/math/statistics modules
 3. Output a result variable (list[dict] or dict)
-4. Optional: generate a matplotlib chart and save to /tmp/chart.png
-5. Pure code, no explanation
+4. Pure code, no explanation
 
 ```python
 import pandas as pd
@@ -102,20 +110,17 @@ result = ...
         resp = await llm.ainvoke([HumanMessage(content=prompt)])
         code = resp.content.strip()
 
-        # Extract code block
         if "```" in code:
             parts = code.split("```")
             code = parts[1] if len(parts) > 1 else parts[0]
             if code.startswith("python\n"):
                 code = code[7:]
 
-        # 2. Security check
         is_safe, msg = validate_code(code)
         if not is_safe:
             logger.warning(f"Python code security check failed: {msg}")
             return {"code_result": {"error": msg}}
 
-        # 3. Subprocess execution
         result = _execute_python(code, data_str)
 
         logger.info(f"Python execution done: {str(result)[:100]}")
@@ -127,23 +132,35 @@ result = ...
 
 
 def _execute_python(code: str, data_json: str, timeout: int = 30) -> dict:
-    """Safely execute Python code in a subprocess"""
-    # Wrap code: inject data + capture result
+    """Execute Python code in a subprocess.
+
+    Data is written to a temp JSON file to prevent triple-quote injection.
+    The wrapper reads data from the file, eliminating f-string escape risk.
+    """
     import textwrap as _tw
     indented = _tw.indent(code, "    ")
-    wrapper = f"""
-import json, sys
-_data = json.loads('''{data_json}''')
-try:
-{indented}
-    if 'result' not in dir():
-        result = {{"error": "code did not define result variable"}}
-    print(json.dumps(result, default=str, ensure_ascii=False))
-except Exception as e:
-    print(json.dumps({{"error": str(e)}}))
-"""
 
+    data_path = safe_temp_path(suffix="_data.json")
     script_path = safe_temp_path(suffix=".py")
+
+    with open(data_path, "w", encoding="utf-8") as f:
+        f.write(data_json)
+
+    # Use raw string + escaped path to prevent backslash issues
+    safe_path = data_path.replace("\\", "\\\\")
+    wrapper = f'\
+import json, sys\n\
+with open(r"{safe_path}", "r", encoding="utf-8") as _f:\n\
+    _data = json.load(_f)\n\
+try:\n\
+{indented}\n\
+    if "result" not in dir():\n\
+        result = {{"error": "code did not define result variable"}}\n\
+    print(json.dumps(result, default=str, ensure_ascii=False))\n\
+except Exception as e:\n\
+    print(json.dumps({{"error": str(e)}}))\n\
+'
+
     with open(script_path, "w", encoding="utf-8") as f:
         f.write(wrapper)
 
@@ -169,5 +186,11 @@ except Exception as e:
     except subprocess.TimeoutExpired:
         return {"error": f"Execution timeout ({timeout}s)"}
     finally:
-        import os
-        os.unlink(script_path)
+        try:
+            os.unlink(script_path)
+        except OSError:
+            pass
+        try:
+            os.unlink(data_path)
+        except OSError:
+            pass

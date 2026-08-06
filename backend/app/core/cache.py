@@ -1,7 +1,10 @@
-"""Simple LRU cache with TTL."""
+"""LRU TTL cache with async locks and deterministic hashing."""
+
+import asyncio
+import hashlib
+import json
 import time
 from collections import OrderedDict
-from threading import Lock
 
 
 class TTLCache:
@@ -9,10 +12,10 @@ class TTLCache:
         self.maxsize = maxsize
         self.ttl = ttl
         self._cache: OrderedDict = OrderedDict()
-        self._lock = Lock()
+        self._lock = asyncio.Lock()
 
-    def get(self, key):
-        with self._lock:
+    async def get(self, key):
+        async with self._lock:
             if key in self._cache:
                 val, ts = self._cache[key]
                 if time.time() - ts < self.ttl:
@@ -21,57 +24,57 @@ class TTLCache:
                 del self._cache[key]
             return None
 
-    def set(self, key, val):
-        with self._lock:
+    async def set(self, key, val):
+        async with self._lock:
             self._cache[key] = (val, time.time())
             self._cache.move_to_end(key)
             while len(self._cache) > self.maxsize:
                 self._cache.popitem(last=False)
 
-    def clear(self):
-        with self._lock:
+    async def clear(self):
+        async with self._lock:
             self._cache.clear()
 
 
-# Global cache instance (caches SSE responses, 10 min TTL)
+def _stable_hash(key: str) -> str:
+    return hashlib.md5(str(key).encode()).hexdigest()
+
+
 query_cache = TTLCache(maxsize=50, ttl=600)
 
 
-# C5: Redis cache backend (shared across workers)
 class RedisCache:
-    """Redis cache, replaces in-process TTLCache (C5-01/02/03)."""
+    """Redis cache with deterministic hashing and async-safe fallback."""
+
     def __init__(self, prefix: str = "cache:", ttl: int = 600):
         self.prefix = prefix
         self.ttl = ttl
-        self._fallback = TTLCache(maxsize=50, ttl=ttl)  # Fallback when Redis is unavailable
+        self._fallback = TTLCache(maxsize=50, ttl=ttl)
 
     async def get(self, key: str):
-        import json
         from app.clients.redis_client_manager import redis_client_manager
-        cache_key = f"{self.prefix}{hash(key)}"
+        cache_key = f"{self.prefix}{_stable_hash(key)}"
         try:
             if redis_client_manager.client:
                 val = await redis_client_manager.client.get(cache_key)
                 if val:
                     return json.loads(val)
-            return self._fallback.get(key)
+            return await self._fallback.get(key)
         except Exception:
-            return self._fallback.get(key)
+            return await self._fallback.get(key)
 
     async def set(self, key: str, val):
-        import json
         from app.clients.redis_client_manager import redis_client_manager
-        cache_key = f"{self.prefix}{hash(key)}"
+        cache_key = f"{self.prefix}{_stable_hash(key)}"
         try:
             if redis_client_manager.client:
-                # C5-01: Limit val size (SSE max 1MB)
                 serialized = json.dumps(val, ensure_ascii=False)
                 if len(serialized) < 1_000_000:
                     await redis_client_manager.client.setex(cache_key, self.ttl, serialized)
                 return
-            self._fallback.set(key, val)
+            await self._fallback.set(key, val)
         except Exception:
-            self._fallback.set(key, val)
+            await self._fallback.set(key, val)
 
-# Global instance
+
 redis_cache = RedisCache(prefix="da:", ttl=600)

@@ -1,5 +1,7 @@
 """Operator hierarchy: MapOp, JoinOp, BranchOp, InputOp, StreamOp, ReduceOp."""
 
+from __future__ import annotations
+
 import asyncio
 from abc import ABC, abstractmethod
 from typing import Any, AsyncIterator, Callable, Dict, Generic, List, Optional, TypeVar
@@ -11,7 +13,7 @@ T = TypeVar("T")
 
 
 class BaseOperator(DagNode, ABC):
-    """Executable node: _run(ctx) → result stored in ctx.node_outputs."""
+    """Executable node: _run(ctx) -> result stored in ctx.node_outputs."""
 
     def __init__(self, name: str, max_retries: int = 1):
         super().__init__(name)
@@ -19,8 +21,7 @@ class BaseOperator(DagNode, ABC):
         self._config: Dict[str, Any] = {}
 
     @abstractmethod
-    async def _run(self, ctx: DagContext) -> Any:
-        ...
+    async def _run(self, ctx: DagContext) -> Any: ...
 
     async def execute(self, ctx: DagContext) -> Any:
         last_error = None
@@ -35,13 +36,13 @@ class BaseOperator(DagNode, ABC):
                     await asyncio.sleep(2 ** attempt)
         raise last_error
 
-    def configure(self, **kwargs) -> BaseOperator:
+    def configure(self, **kwargs) -> "BaseOperator":
         self._config.update(kwargs)
         return self
 
 
 class MapOp(BaseOperator, Generic[IN, OUT]):
-    """Single input → single output. Implement map(input)→output or pass fn."""
+    """Single input -> single output. Implement map(input)->output or pass fn."""
 
     def __init__(self, name: str, map_fn: Optional[Callable[[Any], Any]] = None, **kwargs):
         super().__init__(name, **kwargs)
@@ -58,7 +59,7 @@ class MapOp(BaseOperator, Generic[IN, OUT]):
 
 
 class JoinOp(BaseOperator, Generic[OUT]):
-    """Multiple inputs → single output. Implement combine(dict)→output."""
+    """Multiple inputs -> single output. Implement combine(dict)->output."""
 
     async def _run(self, ctx: DagContext) -> OUT:
         inputs = {p.name: ctx.get_output(p.name) for p in self.upstream}
@@ -68,7 +69,7 @@ class JoinOp(BaseOperator, Generic[OUT]):
         raise NotImplementedError(f"Override combine() in {self.name}")
 
 
-class BranchOp(BaseOperator, Generic[IN]):
+class BranchOp(BaseOperator):
     """Conditional routing. branches = {label: predicate_fn}."""
 
     def __init__(self, name: str, branches: Optional[Dict[str, Callable[[Any], bool]]] = None, **kwargs):
@@ -83,7 +84,7 @@ class BranchOp(BaseOperator, Generic[IN]):
 
 
 class InputOp(BaseOperator, Generic[OUT]):
-    """Read from external source. Implement read(ctx)→output."""
+    """Read from external source. Implement read(ctx)->output."""
 
     async def _run(self, ctx: DagContext) -> OUT:
         return await self.read(ctx)
@@ -93,7 +94,7 @@ class InputOp(BaseOperator, Generic[OUT]):
 
 
 class StreamOp(BaseOperator, Generic[IN, OUT]):
-    """Async streaming. Implement stream(input)→AsyncIterator[output]."""
+    """Async streaming. Implement stream(input)->AsyncIterator[output]."""
 
     async def _run(self, ctx: DagContext) -> List[OUT]:
         inp = ctx.share_data.get("_pipeline_input") if not self.upstream else ctx.get_output(self.upstream[0].name)
@@ -107,7 +108,7 @@ class StreamOp(BaseOperator, Generic[IN, OUT]):
 
 
 class ReduceOp(BaseOperator, Generic[T]):
-    """Multiple upstream → single output. Implement reduce(list)→output."""
+    """Multiple upstream -> single output. Implement reduce(list)->output."""
 
     async def _run(self, ctx: DagContext) -> T:
         inputs = [ctx.get_output(p.name) for p in self.upstream]
