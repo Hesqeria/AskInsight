@@ -1,7 +1,7 @@
-"""Readiness scoring API.
+"""准入评分 API
 
-GET  /api/readiness        - get the score report
-GET  /api/readiness/gate   - check whether the threshold is passed (pre-query check)
+GET  /api/readiness        - 获取评分报告
+GET  /api/readiness/gate   - 检查是否通过门槛（查询前置检查）
 """
 import yaml
 from fastapi import APIRouter, Depends
@@ -12,12 +12,12 @@ from app.core.log import logger
 
 readiness_router = APIRouter()
 
-# Cache
+# 缓存
 _cached_report = None
 
 
 def _load_table_infos() -> list[dict]:
-    """Load table info from meta_config."""
+    """加载 meta_config 中的表信息"""
     from pathlib import Path
     config_path = Path(__file__).parents[3] / "conf" / "meta_config_dw.yaml"
     if not config_path.exists():
@@ -29,7 +29,7 @@ def _load_table_infos() -> list[dict]:
 
 @readiness_router.get("/api/readiness")
 async def get_readiness(user: dict = Depends(verify_token)):
-    """Get the project readiness score report."""
+    """获取项目准入评分报告"""
     global _cached_report
     if _cached_report:
         return _cached_report
@@ -62,15 +62,15 @@ async def get_readiness(user: dict = Depends(verify_token)):
         "recommendations": report.recommendations,
     }
     _cached_report = result
-    logger.info(f"Readiness scoring request: {report.summary}")
+    logger.info(f"准入评分请求: {report.summary}")
     return result
 
 
 @readiness_router.get("/api/readiness/gate")
 async def readiness_gate(user: dict = Depends(verify_token)):
-    """Readiness gate check (pre-query).
+    """准入门禁检查（查询前置）
 
-    Only when passed=True is the NL2SQL query allowed to execute.
+    返回 passed=True 才允许执行 NL2SQL 查询。
     """
     global _cached_report
     if not _cached_report:
@@ -84,7 +84,40 @@ async def readiness_gate(user: dict = Depends(verify_token)):
 
 @readiness_router.post("/api/readiness/refresh")
 async def refresh_readiness(user: dict = Depends(verify_token)):
-    """Refresh the score cache (call after metadata updates)."""
+    """刷新评分缓存（元数据更新后调用）"""
     global _cached_report
     _cached_report = None
-    return {"message": "Cache cleared; the next request will re-score"}
+    return {"message": "缓存已清除，下次请求将重新评分"}
+
+@readiness_router.post("/api/readiness/agent")
+async def run_agent_smoke_test(user: dict = Depends(verify_token)):
+    """Run agent end-to-end smoke test — DB + Schema + Query + Embedding + LLM + Milvus."""
+    from app.scripts.agent_readiness import AgentSmokeTest
+    from app.clients.doris_client_manager import doris_client_manager
+    from app.clients.embedding_client_manager import embedding_client_manager
+    from app.clients.milvus_client_manager import milvus_client_manager
+    from app.agent.llm import llm
+    
+    tester = AgentSmokeTest(
+        session_factory=doris_client_manager.session_factory,
+        embedding_client=embedding_client_manager,
+        llm_client=llm,
+        milvus_client=milvus_client_manager,
+    )
+    results = await tester.run_all()
+    score = tester.compute_score(results)
+    
+    return {
+        "score": score,
+        "passed": score == 100,
+        "tests": [
+            {
+                "name": r.name,
+                "passed": r.passed,
+                "elapsed_ms": r.elapsed_ms,
+                "detail": r.detail,
+                "error": r.error,
+            }
+            for r in results
+        ]
+    }
