@@ -1,5 +1,24 @@
 <template>
-  <div class="chat-page">
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-header"><span class="logo">{{ t("title") }}</span></div>
+      <nav class="nav-links">
+        <router-link to="/" class="nav-item">{{ t("chat") }}</router-link>
+        <router-link to="/schema" class="nav-item">{{ t("schema") }}</router-link>
+        <router-link to="/settings" class="nav-item">{{ t("settings") }}</router-link>
+        <router-link to="/admin/pipelines" class="nav-item">{{ t("pipelines") }}</router-link>
+        <router-link to="/admin/readiness" class="nav-item">{{ t("readiness") }}</router-link>
+      </nav>
+      <div class="sidebar-section"><h4>{{ t("history") }}</h4>
+        <div v-if="queryHistory.length===0" class="empty-hint">{{ t("noQueries") }}</div>
+        <div v-for="(h,i) in queryHistory.slice(0,20)" :key="i" class="hist-item" @click="replayQuery(h)">{{h.slice(0,40)}}{{h.length>40?"...":""}}</div>
+      </div>
+      <div class="sidebar-section"><h4>{{ t("favorites") }}</h4>
+        <div v-if="favQueries.length===0" class="empty-hint">{{ t("noFavorites") }}</div>
+        <div v-for="(f,i) in favQueries" :key="i" class="hist-item" @click="replayQuery(f)">{{f.slice(0,40)}}{{f.length>40?"...":""}}</div>
+      </div>
+    </aside>
+    <div class="chat-page">
     <div ref="messagesEl" class="messages">
       <div
         v-for="(msg, index) in messages"
@@ -26,7 +45,8 @@
             <div :ref="el => chartEls[index] = el" class="chart-box"></div>
           </div>
 
-          <div v-else-if="msg.type === 'table'" class="table-wrap">
+          <div v-else-if="msg.type === 'table' || msg.type === 'table-with-sql'" class="table-wrap">
+            <details v-if="msg.sql" class="sql-details"><summary>{{ t("showSQL") }}</summary><pre class="sql-block">{{msg.sql}}</pre></details>
             <table class="result-table">
               <thead>
                 <tr><th v-for="col in msg.columns" :key="col">{{ col }}</th></tr>
@@ -37,6 +57,7 @@
                 </tr>
               </tbody>
             </table>
+            <div class="table-actions"><button class="export-btn" @click="exportCSV(msg)">{{ t("exportCSV") }}</button></div>
           </div>
 
           <div v-else-if="msg.type === 'reply'" class="reply-text">{{ msg.content }}</div>
@@ -49,33 +70,20 @@
 
     <div class="input-wrapper">
       <div class="input-box">
-        <input v-model="question" @keyup.enter="sendQuestion" placeholder="Ask your data question..." />
-        <button @click="sendQuestion" :disabled="loading">{{ loading ? "Processing..." : "Ask" }}</button>
+        <input v-model="question" @keyup.enter="sendQuestion" :placeholder="t('placeholder')" />
+        <button @click="sendQuestion" :disabled="loading">{{ loading ? t("processing") : t("ask") }}</button>
       </div>
     </div>
+  </div>
   </div>
 </template>
 
 <script setup>
-import { nextTick, ref, watch } from "vue";
-import * as echarts from "echarts";
+import {nextTick,ref,watch,onMounted,onUnmounted,computed} from 'vue';import * as echarts from 'echarts';import {useI18n} from './utils/i18n.js';const {locale,t}=useI18n();const API_URL='/api/query';const question=ref('');const loading=ref(false);const messages=ref([]);const messagesEl=ref(null);const chartEls=ref({});const chartInstances={};const queryHistory=ref(JSON.parse(localStorage.getItem("askinsight_history")||"[]"));const favQueries=ref(JSON.parse(localStorage.getItem("askinsight_favs")||"[]"));function saQH(){localStorage.setItem("askinsight_history",JSON.stringify(queryHistory.value))}function saFQ(){localStorage.setItem("askinsight_favs",JSON.stringify(favQueries.value))}function quickAsk(q){if(loading.value)return;question.value=q;sendQuestion()}function replayQuery(q){if(loading.value)return;question.value=q;sendQuestion()}function onKeyDown(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendQuestion()}}const examples=computed(()=>{const m={en:["Top regions by sales","Brand sales share","Top 3 customers by spend","Monthly sales trend","High-value customers","Member tier comparison"],cn:["各区域销售额排行","品牌销售占比","消费金额Top3客户","月度销售趋势","高价值客户品类","会员等级对比"]};return m[locale.value]||m.en})
 
-const API_URL = "/api/query";
-const question = ref("");
-const loading = ref(false);
-const messages = ref([]);
-const messagesEl = ref(null);
-const chartEls = ref({});
-const chartInstances = {};
-const queryHistory = ref([])
-const llmProviders = ref([])
-const selectedProvider = ref("")
 
-async function loadProviders(){try{var r=await fetch("/api/admin/llm/providers");var d=await r.json();if(d.providers){llmProviders.value=d.providers;selectedProvider.value=d.providers[0]||""}}catch(e){}}
-async function switchLLM(){try{await fetch("/api/admin/llm/switch",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({provider:selectedProvider.value})})}catch(e){}}
-loadProviders()
 
-const examples = ["Top regions by sales", "Brand sales share", "Top 3 customers by spend", "Member tier comparison", "Monthly sales trend Q1 2025", "High-value customer category"];
+
 
 function cellStyle(msg,row,col){var val=row[col];if(typeof val!=="number")return"";var ck="_"+col+"_color";if(row[ck])return"color:"+row[ck];return""}
 
@@ -123,6 +131,8 @@ function renderChart(index, msg) {
   });
 }
 
+onMounted(()=>{window.addEventListener('resize',()=>{Object.values(chartInstances).forEach(c=>{try{c.resize()}catch{}})})});
+onUnmounted(()=>{Object.values(chartInstances).forEach(c=>{try{c.dispose()}catch{}})});
 watch(messages, () => {
   messages.value.forEach((msg, idx) => {
     if (msg.type === "chart") renderChart(idx, msg);
@@ -152,7 +162,7 @@ async function sendQuestion() {
     const reader = response.body.getReader();
     const decoder = new TextDecoder("utf-8");
     let buffer = "";
-    let resultData = null;
+    let resultData = null; let sqlText = null;
     let isError = false;
 
     while (true) {
@@ -181,7 +191,7 @@ async function sendQuestion() {
         } else if (Array.isArray(data.result)) {
           const last = steps.at(-1);
           if (last) last.status = "success";
-          resultData = data.result;
+          resultData = data.result; if(data.sql) sqlText = data.sql;
         }
         await nextTick();
         scrollToBottom();
@@ -207,12 +217,12 @@ async function sendQuestion() {
         });
       } else {
         messages.value.push({
-          role: "assistant", type: "table",
+          role: "assistant", type: "table-with-sql", sql: sqlText,
           columns: Object.keys(resultData[0] || {}),
           rows: resultData,
         });
       }
-      queryHistory.value.push(q);
+      queryHistory.value.unshift(q);if(queryHistory.value.length>50)queryHistory.value=queryHistory.value.slice(0,50);saQH();
     }
   } catch (e) {
     messages.value.push({ role: "assistant", type: "error", content: e?.message || "Request failed" });
@@ -224,6 +234,19 @@ async function sendQuestion() {
 }
 </script>
 
+<style scoped>
+.app-shell{display:flex;height:100%}
+.sidebar{width:240px;min-width:240px;background:#f8f9fb;border-right:1px solid #e5e7eb;display:flex;flex-direction:column;overflow-y:auto}
+.sidebar-header{padding:16px;border-bottom:1px solid #e5e7eb}
+.logo{font-weight:700;font-size:16px;color:#409eff}
+.nav-links{padding:8px}
+.nav-item{display:block;padding:10px 12px;border-radius:6px;text-decoration:none;color:#333;font-size:14px;margin-bottom:2px}
+.nav-item:hover,.nav-item.router-link-active{background:#e8f4fd}
+.sidebar-section{padding:12px;border-top:1px solid #e5e7eb}
+.sidebar-section h4{margin:0 0 8px;font-size:12px;color:#999;text-transform:uppercase}
+.hist-item{padding:6px 0;font-size:12px;color:#555;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hist-item:hover{color:#409eff}
+.empty-hint{font-size:12px;color:#ccc;font-style:italic}
 <style scoped>
 :global(html), :global(body) { height: 100%; margin: 0; }
 :global(body) { display: block !important; place-items: unset !important; }
@@ -253,6 +276,7 @@ async function sendQuestion() {
 .result-table th { background: #fafafa; font-weight: 600; }
 .reply-text { line-height: 1.6; }
 .error-text { color: #e74c3c; font-weight: 600; }
+.sql-details{margin-bottom:8px}.sql-details summary{cursor:pointer;font-size:13px;color:#409eff}.sql-block{background:#f9fafb;border:1px solid #e5e7eb;border-radius:4px;padding:10px;font-size:12px;overflow-x:auto;max-height:160px;margin:6px 0;white-space:pre-wrap;word-break:break-all}.table-actions{display:flex;gap:8px;margin-top:0;margin-bottom:8px}
 .input-wrapper { position: fixed; left: 0; right: 0; bottom: 24px; display: flex; justify-content: center; padding: 0 16px; pointer-events: none; }
 .input-box { pointer-events: auto; width: 100%; max-width: 720px; display: flex; gap: 12px; padding: 14px 16px; border-radius: 999px; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border: 1px solid rgba(0, 0, 0, 0.08); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12); }
 .input-box input { flex: 1; border: none; outline: none; background: transparent; font-size: 15px; }
