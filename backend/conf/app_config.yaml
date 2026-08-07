@@ -10,41 +10,51 @@ logging:
     level: INFO
 
 doris:
-  host: ${oc.env:DORIS_HOST, 127.0.0.1}
+  host: ${oc.env:DORIS_HOST,127.0.0.1}
   port: 9030
   user: root
-  password: ${oc.env:DORIS_PASSWORD, nld1024.}
+  password: ${oc.env:DORIS_PASSWORD,}
   database: dw
 
 milvus:
-  host: ${oc.env:MILVUS_HOST, 127.0.0.1}
+  host: ${oc.env:MILVUS_HOST,127.0.0.1}
   port: 19530
   user: root
-  password: ${oc.env:MILVUS_PASSWORD, milvus}
+  password: ${oc.env:MILVUS_PASSWORD,}
   embedding_size: 1024
-  column_collection: data_agent_column
-  metric_collection: data_agent_metric
+  column_collection: data-agent-column
+  metric_collection: data-agent-metric
 
 embedding:
-  api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
-  api_key: ${oc.env:EMBEDDING_API_KEY, sk-placeholder}
-  model: text-embedding-v3
+  api_base: ${oc.env:EMBEDDING_BASE_URL,}
+  api_key: ${oc.env:EMBEDDING_API_KEY,}
+  model: ${oc.env:EMBEDDING_MODEL,text-embedding-v3}
+
+redis:
+  host: ${oc.env:REDIS_HOST,127.0.0.1}
+  port: 6379
+  password: ${oc.env:REDIS_PASSWORD,}
+
+superset:
+  url: ${oc.env:SUPERSET_URL,http://127.0.0.1:8088}
+  username: ${oc.env:SUPERSET_USER,admin}
+  password: ${oc.env:SUPERSET_PASSWORD,}
 
 llm:
-  model_name: ${oc.env:LLM_MODEL_NAME, deepseek-chat}
-  api_key: ${oc.env:LLM_API_KEY, sk-placeholder}
-  base_url: ${oc.env:LLM_BASE_URL, https://api.deepseek.com}
+  model_name: ${oc.env:LLM_MODEL_NAME,deepseek-chat}
+  api_key: ${oc.env:LLM_API_KEY,}
+  base_url: ${oc.env:LLM_BASE_URL,https://api.deepseek.com}
 
 pg:
-  host: ${oc.env:PG_HOST, 127.0.0.1}
+  host: ${oc.env:PG_HOST,127.0.0.1}
   port: 5432
   user: app
-  password: ${oc.env:PG_PASSWORD, postgres}
+  password: ${oc.env:PG_PASSWORD,}
   database: app
 
 mysql:
-  host: 127.0.0.1
+  host: ${oc.env:MYSQL_HOST,127.0.0.1}
   port: 3306
   user: root
-  password: ""
+  password: ${oc.env:MYSQL_PASSWORD,}
   database: test

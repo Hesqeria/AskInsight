@@ -58,7 +58,7 @@ async def test_pg_explain():
 def test_pg_config_loaded():
     """PG config loaded correctly"""
     from app.conf.app_config import app_config
-    assert app_config.pg.host == '192.168.137.51'
+    assert app_config.pg.host == 'test-db-host'
     assert app_config.pg.port == 5432
     assert app_config.pg.database == 'app'
 
@@ -75,10 +75,10 @@ def test_pg_client_manager_url_encoded():
     from app.conf.app_config import app_config
     mgr = PGClientManager(app_config.pg)
     url = mgr._get_url()
-    assert 'StrongPg' in url
+    assert 'test-password' in url
     assert quote_check(url)
 
 def quote_check(url):
     """confirm @ is encoded as %40"""
-    # password is StrongPg@2026; after encoding should be StrongPg%402026
+    # password is test-password@2026; after encoding should be test-password%402026
     return '%40' in url or '@' not in url.split('://')[1].split('@')[0]

@@ -6,9 +6,10 @@ import httpx
 from datetime import datetime
 from app.core.log import logger
 
-SUPERSET_URL = os.getenv("SUPERSET_URL", "http://127.0.0.1:8088")
-SUPERSET_USER = os.getenv("SUPERSET_USER", "admin")
-SUPERSET_PASSWORD = os.getenv("SUPERSET_PASSWORD", "admin")
+from app.conf.app_config import app_config as _ac
+SUPERSET_URL = os.getenv("SUPERSET_URL", _ac.superset.url)
+SUPERSET_USER = os.getenv("SUPERSET_USER", _ac.superset.username)
+SUPERSET_PASSWORD = os.getenv("SUPERSET_PASSWORD", _ac.superset.password)
 
 _token: str | None = None
 _token_expiry: float = 0

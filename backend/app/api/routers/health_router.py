@@ -34,12 +34,14 @@ async def health():
     # 5. LLM (config check only, no request sent, P2-C3)
     checks["llm"] = "configured" if app_config.llm.api_key else "missing"
 
-    all_ok = all(v in ("ok", "configured", "degraded") for v in checks.values())
-    status_code = 200 if all_ok else 503
+    healthy_states = {"ok", "configured", "degraded"}
+    status_checks = {k: v for k, v in checks.items() if not k.endswith("_pool")}
+    has_critical = any(v not in healthy_states for v in status_checks.values())
+    status_code = 503 if has_critical else 200
     from fastapi.responses import JSONResponse
     return JSONResponse(
         status_code=status_code,
-        content={"status": "healthy" if all_ok else "unhealthy", "checks": checks}
+        content={"status": "unhealthy" if has_critical else "healthy", "checks": checks}
     )
 
 

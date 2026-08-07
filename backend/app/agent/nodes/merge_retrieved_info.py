@@ -154,12 +154,7 @@ async def merge_retrieved_info(state: DataAgentState, runtime: Runtime[DataAgent
 
         metric_infos = [_metric_milvus_to_state(m) for m in retrieved_metrics]
         logger.info(f"RRF fusion done: {len(table_infos)} tables, {len(metric_infos)} metrics")
-            # DC-06: Truncate state data to prevent OOM
-    column_infos = column_infos[:20]
-    for c in column_infos:
-        c.examples = c.examples[:5]
-    table_infos = table_infos[:10]
-    return {"table_infos": table_infos, "metric_infos": metric_infos}
+
     except Exception as e:
         logger.error(f"RRF fusion error: {e}")
         raise

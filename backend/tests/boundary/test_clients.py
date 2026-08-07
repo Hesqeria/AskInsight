@@ -8,12 +8,12 @@ from app.clients.embedding_client_manager import EmbeddingClientManager
 
 
 def _fake_doris():
-    return DorisConfig(host="192.168.0.1", port=9999, user="u", password="p",
+    return DorisConfig(host="test-host.local", port=9999, user="u", password="p",
                       database="data_agent")
 
 
 def _fake_milvus():
-    return MilvusConfig(host="192.168.0.1", port=9999, user="u", password="p",
+    return MilvusConfig(host="test-host.local", port=9999, user="u", password="p",
                        embedding_size=1024, column_collection="c", metric_collection="m")
 
 

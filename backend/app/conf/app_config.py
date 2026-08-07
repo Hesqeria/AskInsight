@@ -85,6 +85,20 @@ class MySQLConfig:
     password: str = ""
     database: str = ""
 
+
+@dataclass
+class RedisConfig:
+    host: str
+    port: int = 6379
+    password: str = ""
+
+
+@dataclass
+class SupersetConfig:
+    url: str
+    username: str = "admin"
+    password: str = ""
+
 @dataclass
 class AppConfig:
     logging: LoggingConfig
@@ -94,6 +108,8 @@ class AppConfig:
     llm: LLMConfig
     pg: PGConfig
     mysql: MySQLConfig
+    redis: RedisConfig
+    superset: SupersetConfig
 
 
 _config_file = Path(__file__).parents[2] / "conf" / "app_config.yaml"
