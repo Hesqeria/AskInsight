@@ -11,6 +11,10 @@ from app.api.routers.admin_router import admin_router
 from app.api.routers.upload_router import upload_router
 from app.api.routers.health_router import health_router
 from app.api.routers.readiness_router import readiness_router
+from app.api.routers.quality_router import quality_router
+from app.api.routers.docs_router import docs_router
+from app.api.routers.model_router import model_router
+from app.api.routers.lineage_router import lineage_router
 from app.clients.doris_client_manager import doris_client_manager
 from app.clients.embedding_client_manager import embedding_client_manager
 from app.clients.milvus_client_manager import milvus_client_manager
@@ -51,6 +55,10 @@ app.include_router(admin_router)
 app.include_router(report_router)
 app.include_router(query_router)
 app.include_router(readiness_router)
+app.include_router(quality_router)
+app.include_router(docs_router)
+app.include_router(model_router)
+app.include_router(lineage_router)
 
 
 @app.middleware("http")
