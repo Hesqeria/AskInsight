@@ -19,6 +19,8 @@ from app.core.log import logger
 
 
 def _detect_chart_heuristic(data: list) -> str:
+    if not data:
+        return "empty"
     """Rule engine: quickly pre-judge chart type (without calling LLM)"""
     if not data:
         return "table"

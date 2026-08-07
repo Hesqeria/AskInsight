@@ -21,7 +21,14 @@ from sqlalchemy import text
 
 from app.agent.context import DataAgentContext
 from app.agent.state import DataAgentState
+import re
 from app.core.log import logger
+
+
+def _safe_dimension(dim: str) -> str:
+    """Sanitize dimension name: only [a-zA-Z0-9_] allowed."""
+    safe = re.sub(r'[^a-zA-Z0-9_]', '_', str(dim))[:64]
+    return safe if safe else 'unknown'
 
 
 # DWS->DWD lineage mapping (hardcoded; can be fetched dynamically from sql_lineage)

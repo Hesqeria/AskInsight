@@ -13,21 +13,21 @@ doris:
   host: ${oc.env:DORIS_HOST, 127.0.0.1}
   port: 9030
   user: root
-  password: ${oc.env:DORIS_PASSWORD}
+  password: ${oc.env:DORIS_PASSWORD, nld1024.}
   database: dw
 
 milvus:
   host: ${oc.env:MILVUS_HOST, 127.0.0.1}
   port: 19530
   user: root
-  password: ${oc.env:MILVUS_PASSWORD}
+  password: ${oc.env:MILVUS_PASSWORD, milvus}
   embedding_size: 1024
   column_collection: data_agent_column
   metric_collection: data_agent_metric
 
 embedding:
   api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
-  api_key: ${oc.env:EMBEDDING_API_KEY}
+  api_key: ${oc.env:EMBEDDING_API_KEY, sk-placeholder}
   model: text-embedding-v3
 
 llm:

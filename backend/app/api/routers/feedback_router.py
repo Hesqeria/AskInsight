@@ -26,11 +26,11 @@ async def submit_feedback(
     session: AsyncSession = Depends(get_meta_session),
 ):
     """User submits a corrected SQL (improves accuracy over time)."""
-    # P3-D2: safety check on corrected_sql (only SELECT allowed)
-    import re as _re
-    dangerous = _re.search(r'(drop|delete|truncate|alter|insert|update|grant|revoke)', body.corrected_sql, _re.IGNORECASE)
-    if dangerous:
-        return {'status': 'error', 'message': f'Corrected SQL contains dangerous operation: {dangerous.group()}'}
+    # Safety check via validate_sql_safety (NFKC + homoglyph aware)
+    from app.agent.nodes.validate_sql_safety import validate_sql_safety
+    is_safe, reason = validate_sql_safety(body.corrected_sql)
+    if not is_safe:
+        return {'status': 'error', 'message': f'Corrected SQL rejected: {reason}'}
     if not body.corrected_sql.strip().upper().startswith('SELECT'):
         return {'status': 'error', 'message': 'Corrected SQL must be a SELECT statement'}
 

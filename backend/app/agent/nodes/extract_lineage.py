@@ -11,6 +11,8 @@ from app.core.log import logger
 
 
 def extract_lineage_from_sql(sql: str) -> list:
+    if not sql or not sql.strip():
+        return []
     """Extract column-level lineage relationships from SQL
 
     Returns:

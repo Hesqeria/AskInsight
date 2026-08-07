@@ -44,10 +44,14 @@ async def anomaly_detection(state: DataAgentState, runtime: Runtime[DataAgentCon
             logger.info(f"Anomaly detection: fewer than {MIN_BASELINE_POINTS} baseline points, skipping detection")
             return {}
 
-        # Compute Z-Score
+        # Compute Z-Score (sample standard deviation, ddof=1 for unbiased estimate)
         baseline_values = [b["value"] for b in baselines]
-        avg = sum(baseline_values) / len(baseline_values)
-        std = math.sqrt(sum((v - avg) ** 2 for v in baseline_values) / len(baseline_values))
+        n = len(baseline_values)
+        if n < 2:
+            logger.info("Anomaly detection: insufficient baseline data (N<2), skipping")
+            return {}
+        avg = sum(baseline_values) / n
+        std = math.sqrt(sum((v - avg) ** 2 for v in baseline_values) / (n - 1))
 
         if std == 0:
             logger.info("Anomaly detection: std deviation is 0, skipping")

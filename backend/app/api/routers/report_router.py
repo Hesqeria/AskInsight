@@ -34,6 +34,8 @@ async def generate_report(
     }
     """
     sections = []
+    if len(req.queries) > 10:
+        return JSONResponse({"error": "Too many queries (max 10)"}, status_code=400)
     for q in req.queries:
         # Call the NL2SQL system
         result_data = None
