@@ -40,7 +40,8 @@ return count
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return bcrypt.checkpw(plain.encode(), hashed.encode())
+    # bcrypt has 72-byte limit; truncate to avoid ValueError
+    return bcrypt.checkpw(plain.encode()[:72], hashed.encode())
 
 
 def _redis_available() -> bool:

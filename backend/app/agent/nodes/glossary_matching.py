@@ -1,7 +1,8 @@
-"""Glossary matching node: business terms -> standard field mapping"""
+"""Glossary matching node: business terms -> standard field mapping."""
 from langgraph.runtime import Runtime
 from app.agent.context import DataAgentContext
 from app.agent.state import DataAgentState
+from app.agent.keywords import sanitize_keywords
 from app.core.log import logger
 from sqlalchemy import text
 
@@ -14,11 +15,10 @@ async def glossary_matching(state: DataAgentState, runtime: Runtime[DataAgentCon
         query = state.get("query", "")
         keywords = state.get("keywords", [])
 
-        # Match terms from query
+        terms = sanitize_keywords(keywords + [query])
         matched = []
-        all_terms = keywords + [query]
-        for term in all_terms:
-            if not term or len(term) < 1:
+        for term in terms:
+            if len(term) < 1:
                 continue
             sql = "SELECT term, standard_name, table_name, column_name, description FROM glossary WHERE term MATCH :term LIMIT 5"
             result = await meta_repo.session.execute(text(sql), {"term": term})
@@ -29,7 +29,6 @@ async def glossary_matching(state: DataAgentState, runtime: Runtime[DataAgentCon
                     "description": row[4],
                 })
 
-        # Deduplicate
         seen = set()
         unique = []
         for m in matched:
@@ -39,7 +38,7 @@ async def glossary_matching(state: DataAgentState, runtime: Runtime[DataAgentCon
                 unique.append(m)
 
         logger.info(f"Glossary matching: {len(unique)} matches")
-        return {"glossary_matches": unique}
+        return {"glossary_matches": unique[:20]}
     except Exception as e:
         logger.error(f"Glossary matching error: {e}")
         return {"glossary_matches": []}

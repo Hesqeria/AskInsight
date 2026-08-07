@@ -67,6 +67,7 @@ async def _check_doris() -> str:
 
 async def _check_redis() -> str:
     try:
-        return "ok" if redis_client_manager.client.ping() else "down"
+        pong = await redis_client_manager.client.ping()
+        return "ok" if pong else "down"
     except Exception:
-        return "unreachable"
+        return "down"

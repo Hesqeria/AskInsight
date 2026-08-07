@@ -4,6 +4,9 @@ import re
 import unicodedata
 
 
+ALLOWED_TABLES = set()  # Populated from meta_config at startup
+
+
 FORBIDDEN_KEYWORDS = [
     "DROP", "DELETE", "INSERT", "UPDATE", "ALTER", "CREATE",
     "TRUNCATE", "EXEC", "EXECUTE", "GRANT", "REVOKE", "MERGE",
@@ -66,3 +69,9 @@ def validate_sql_safety(sql: str) -> tuple:
         return False, "Multiple SQL statements not allowed"
 
     return True, "OK"
+
+
+def populate_allowed_tables(table_names):
+    """Populate ALLOWED_TABLES from meta_config at startup."""
+    global ALLOWED_TABLES
+    ALLOWED_TABLES = set(t.lower() for t in table_names)

@@ -31,15 +31,15 @@ embedding:
   model: text-embedding-v3
 
 llm:
-  model_name: ${oc.env:LLM_MODEL_NAME}
-  api_key: ${oc.env:LLM_API_KEY}
-  base_url: ${oc.env:LLM_BASE_URL}
+  model_name: ${oc.env:LLM_MODEL_NAME, deepseek-chat}
+  api_key: ${oc.env:LLM_API_KEY, sk-placeholder}
+  base_url: ${oc.env:LLM_BASE_URL, https://api.deepseek.com}
 
 pg:
   host: ${oc.env:PG_HOST, 127.0.0.1}
   port: 5432
   user: app
-  password: ${oc.env:PG_PASSWORD}
+  password: ${oc.env:PG_PASSWORD, postgres}
   database: app
 
 mysql:

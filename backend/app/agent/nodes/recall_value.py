@@ -4,6 +4,7 @@ from langgraph.runtime import Runtime
 
 from app.agent.context import DataAgentContext
 from app.agent.state import DataAgentState
+from app.agent.keywords import sanitize_keywords
 from app.core.log import logger
 from app.prompt.prompt_loader import load_prompt
 from app.agent.llm import llm
@@ -28,7 +29,8 @@ async def recall_value(state: DataAgentState, runtime: Runtime[DataAgentContext]
             logger.warning(f"LLM expansion failed: {e}")
 
         values_map = {}
-        for kw in keywords:
+        keywords = sanitize_keywords(keywords)
+        for kw in keywords[:20]:
             # B4.3 fallback: search_safe already handles empty keywords internally
             values = await value_repository.search_safe(kw)
             for v in values:

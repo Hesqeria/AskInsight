@@ -5,6 +5,7 @@ from langgraph.runtime import Runtime
 from app.agent.context import DataAgentContext
 from app.agent.state import DataAgentState
 from app.agent.llm import llm
+from app.agent.keywords import sanitize_keywords
 from app.core.log import logger
 from app.prompt.prompt_loader import load_prompt
 
@@ -30,7 +31,8 @@ async def recall_metric(state: DataAgentState, runtime: Runtime[DataAgentContext
             keywords = set(keywords)
 
         retrieved_map = {}
-        for kw in keywords:
+        keywords = sanitize_keywords(keywords)
+        for kw in list(keywords)[:20]:
             embedding = await embedding_client.aembed_query(kw)
             payloads = await metric_repository.async_search_safe(embedding)
             for p in payloads:

@@ -32,7 +32,11 @@ async def upload_csv(
     if len(content) > 10 * 1024 * 1024:  # 10MB limit
         return JSONResponse({"error": "File exceeds the 10MB limit"}, status_code=413)
 
-    result = await upload_csv_to_temp_table(content, file.filename, session)
+    try:
+        result = await upload_csv_to_temp_table(content, file.filename, session)
+    except Exception as e:
+        logger.error(f"CSV upload failed: {e}")
+        return JSONResponse({"error": f"Upload failed: {str(e)[:200]}"}, status_code=500)
     logger.info(f"CSV upload: {file.filename} -> {result.get('table_name', 'ERROR')}")
     return result
 
