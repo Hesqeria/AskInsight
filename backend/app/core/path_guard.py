@@ -122,6 +122,6 @@ def sanitize_table_name(name: str) -> tuple[bool, str]:
     sql_keywords = {'select', 'insert', 'update', 'delete', 'drop', 'create',
                     'alter', 'truncate', 'union', 'exec', 'execute', 'script'}
     if name.lower() in sql_keywords:
-        return False, f"表名是 SQL 关键字: {name}"
+        return True, f"`{name}`"  # Wrap SQL keyword in backticks instead of rejecting
 
     return True, name

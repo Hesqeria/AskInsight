@@ -195,9 +195,9 @@ def _clean_sql(sql: str) -> str:
     sql = sql.rstrip(";").strip()
     # 5. general strip
     sql = sql.strip()
-    # 6. empty fallback
+    # 6. empty fallback - explicit error, no fake data
     if not sql:
-        return "SELECT 1 AS message"
+        raise ValueError("LLM returned empty SQL - generation failed")
     return sql
 
 

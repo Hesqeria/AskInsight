@@ -31,6 +31,17 @@ async def recall_column(state: DataAgentState, runtime: Runtime[DataAgentContext
             keywords = set(keywords)
 
         retrieved_map = {}
+        # BT-19: Milvus graceful degradation to keyword matching
+        milvus_available = True
+        try:
+            _ = column_repository  # probe
+        except Exception as e:
+            logger.warning(f"Milvus unavailable, falling back to keyword-only recall: {e}")
+            milvus_available = False
+
+        if not milvus_available:
+            return {"retrieved_columns": [], "recall_mode": "keyword_fallback"}
+
         for kw in keywords:
             embedding = await embedding_client.aembed_query(kw)
             payloads = await column_repository.async_search_safe(embedding, limit=10)

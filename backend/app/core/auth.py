@@ -1,13 +1,16 @@
-"""JWT authentication + bcrypt password hashing + Redis session + rate limiting."""
+"""JWT authentication + bcrypt + Redis session (with graceful degradation)."""
 import os
 import time
 import uuid
 import sys
 import bcrypt
 import jwt
+import logging
 from fastapi import HTTPException, Request
 
 from app.clients.redis_client_manager import redis_client_manager
+
+logger = logging.getLogger(__name__)
 
 JWT_SECRET = os.getenv("JWT_SECRET")
 if not JWT_SECRET:
@@ -21,17 +24,30 @@ if not ADMIN_PASSWORD_HASH:
         print("FATAL: ADMIN_PASSWORD or ADMIN_PASSWORD_HASH environment variable is required", file=sys.stderr)
         sys.exit(1)
     ADMIN_PASSWORD_HASH = bcrypt.hashpw(plain.encode(), bcrypt.gensalt()).decode()
-    print("INFO: Generated bcrypt hash from ADMIN_PASSWORD", file=sys.stderr)
 
-USERS = {
-    "admin": {"password_hash": ADMIN_PASSWORD_HASH, "role": "admin"},
-}
+USERS = {"admin": {"password_hash": ADMIN_PASSWORD_HASH, "role": "admin"}}
 JWT_EXPIRE = 86400
 RATE_LIMIT = 10
+
+# Lua script for atomic incr + expire (BT-12 race condition fix)
+_RATE_LUA = """
+local count = redis.call('INCR', KEYS[1])
+if count == 1 then
+    redis.call('EXPIRE', KEYS[1], ARGV[1])
+end
+return count
+"""
 
 
 def verify_password(plain: str, hashed: str) -> bool:
     return bcrypt.checkpw(plain.encode(), hashed.encode())
+
+
+def _redis_available() -> bool:
+    try:
+        return redis_client_manager.client is not None
+    except Exception:
+        return False
 
 
 async def create_token(username: str) -> str:
@@ -42,13 +58,17 @@ async def create_token(username: str) -> str:
         "jti": str(uuid.uuid4()),
     }
     token = jwt.encode(payload, JWT_SECRET, algorithm="HS256")
-    session_key = f"session:{payload['jti']}"
-    await redis_client_manager.client.setex(session_key, JWT_EXPIRE, username)
+    if _redis_available():
+        try:
+            session_key = f"session:{payload['jti']}"
+            await redis_client_manager.client.setex(session_key, JWT_EXPIRE, username)
+        except Exception as e:
+            logger.warning(f"Redis session write failed, JWT-only mode: {e}")
     return token
 
 
 async def verify_token(request: Request) -> dict:
-    """FastAPI dependency: extract and verify JWT from Header."""
+    """FastAPI dependency: JWT verify + optional Redis session + rate limit."""
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing authentication token")
@@ -60,17 +80,28 @@ async def verify_token(request: Request) -> dict:
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+    # Redis session check (graceful degradation if Redis down)
     jti = payload.get("jti")
-    if jti:
-        session = await redis_client_manager.client.get(f"session:{jti}")
-        if not session:
-            raise HTTPException(status_code=401, detail="Session expired")
+    if jti and _redis_available():
+        try:
+            session = await redis_client_manager.client.get(f"session:{jti}")
+            if not session:
+                raise HTTPException(status_code=401, detail="Session expired")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.warning(f"Redis session check failed, skipping: {e}")
 
-    rate_key = f"rate:{payload['sub']}"
-    count = await redis_client_manager.client.incr(rate_key)
-    if count == 1:
-        await redis_client_manager.client.expire(rate_key, 60)
-    if count > RATE_LIMIT:
-        raise HTTPException(status_code=429, detail=f"Too many requests (limit {RATE_LIMIT}/min)")
+    # Rate limiting (atomic Lua, graceful degradation)
+    if _redis_available():
+        try:
+            rate_key = f"rate:{payload['sub']}"
+            count = await redis_client_manager.client.eval(_RATE_LUA, 1, rate_key, 60)
+            if count > RATE_LIMIT:
+                raise HTTPException(status_code=429, detail=f"Too many requests (limit {RATE_LIMIT}/min)")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.warning(f"Redis rate limit failed, allowing request: {e}")
 
     return payload

@@ -13,9 +13,15 @@ class TTLCache:
         self.ttl = ttl
         self._cache: OrderedDict = OrderedDict()
         self._lock = asyncio.Lock()
+        self._key_locks: dict = {}
+
+    def _key_lock(self, key):
+        if key not in self._key_locks:
+            self._key_locks[key] = asyncio.Lock()
+        return self._key_locks[key]
 
     async def get(self, key):
-        async with self._lock:
+        async with self._key_lock(key):
             if key in self._cache:
                 val, ts = self._cache[key]
                 if time.time() - ts < self.ttl:
@@ -25,7 +31,7 @@ class TTLCache:
             return None
 
     async def set(self, key, val):
-        async with self._lock:
+        async with self._key_lock(key):
             self._cache[key] = (val, time.time())
             self._cache.move_to_end(key)
             while len(self._cache) > self.maxsize:
