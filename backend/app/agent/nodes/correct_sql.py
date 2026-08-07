@@ -14,6 +14,10 @@ from app.prompt.prompt_loader import load_prompt
 async def correct_sql(state: DataAgentState, runtime: Runtime[DataAgentContext]):
     writer = runtime.stream_writer
     writer({"stage": "Correct SQL"})
+    sql = state.get("sql", "")
+    if not sql or not sql.strip():
+        logger.info("Empty SQL, skipping correction")
+        return {"sql": sql, "error": None}
     try:
         prompt = PromptTemplate(
             template=load_prompt("correct_sql"),

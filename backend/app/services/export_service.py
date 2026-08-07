@@ -1,8 +1,13 @@
+import logging
+_logger = logging.getLogger(__name__)
 """Result export service: Excel + CSV + JSON."""
 import io
 import csv
 import json
 from datetime import datetime
+
+
+MAX_EXPORT_ROWS = 10000
 
 
 def export_excel(data: list[dict], title: str = "Data Export", sheet_name: str = "Sheet1") -> bytes:

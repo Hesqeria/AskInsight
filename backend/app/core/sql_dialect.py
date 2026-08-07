@@ -68,7 +68,7 @@ def detect_dialect_from_config(db_name: str, host: str) -> Dialect:
     - If db_name is "dw" or starts with "doris" → Doris
     - Default → MySQL (Doris uses MySQL protocol)
     """
-    if "doris" in db_name.lower() or "doris" in host.lower():
+    if db_name.lower() == "dw" or ":9030" in host or "doris" in host.lower().split(".")[0]:
         return Dialect.DORIS
     if db_name == "dw":
         return Dialect.DORIS

@@ -5,6 +5,7 @@ from app.agent.context import DataAgentContext
 from app.agent.state import DataAgentState
 from app.agent.llm import llm
 from app.core.log import logger
+from app.core.llm_retry import safe_ainvoke
 
 INTENT_PROMPT = """Determine whether the user input is "data query" or "chitchat".
 
@@ -24,7 +25,7 @@ async def intent_recognition(state: DataAgentState, runtime: Runtime[DataAgentCo
         prompt_msg = INTENT_PROMPT.replace("{query}", query)
         # Use LLM for synchronous judgment (avoid PromptTemplate to prevent variable conflicts)
         from langchain_core.messages import HumanMessage
-        resp = await llm.ainvoke([HumanMessage(content=prompt_msg)])
+        resp = await safe_ainvoke(llm, [HumanMessage(content=prompt_msg)])
         content = resp.content.strip()
         # Extract JSON (compatible with markdown wrapping)
         if "```" in content:

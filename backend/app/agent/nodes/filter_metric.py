@@ -28,7 +28,9 @@ async def filter_metric(state: DataAgentState, runtime: Runtime[DataAgentContext
             })
         except Exception as e:
             logger.warning(f"filter_metric JSON parsing failed: {e}")
-            return {"metric_infos": metric_infos}
+            if not metric_infos:
+        metric_infos = []
+    return {"metric_infos": metric_infos}
         sel = set(result if isinstance(result, list) else [])
         metric_infos = [m for m in metric_infos if m["name"] in sel]
         logger.info("Filter metrics done")

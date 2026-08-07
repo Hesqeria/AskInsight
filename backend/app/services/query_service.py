@@ -1,5 +1,6 @@
 import json
 import time
+import asyncio
 
 from app.agent.context import DataAgentContext
 from app.agent.graph import graph
@@ -64,8 +65,13 @@ class QueryService:
                     if isinstance(chunk.get("result"), list):
                         result_rows = len(chunk["result"])
             await redis_cache.set(cache_key, sse_lines)
+        except asyncio.CancelledError:
+            # Client disconnected - silent exit, no error log
+            logger.info(f"Client disconnected (request_id={request_id})")
+            status = "cancelled"
+            raise
         except Exception as e:
-            logger.error(f"QueryService exception: {e}")
+            logger.error(f"QueryService exception: {e}", exc_info=True)
             status = "error"
             err_line = 'data: ' + json.dumps({"error": str(e)}, ensure_ascii=False, default=str) + '\n\n'
             yield err_line

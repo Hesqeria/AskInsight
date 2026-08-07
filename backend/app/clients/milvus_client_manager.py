@@ -74,6 +74,8 @@ class MilvusClientManager:
         return self._reconnect()
 
     def safe_search(self, collection_name: str, data: list, **kwargs) -> list:
+        if not data:
+            return []
         """带自动重连的 search（WrenAI #1121 教训）
 
         连接断开时自动重连后重试。
