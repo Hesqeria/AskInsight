@@ -7,6 +7,7 @@ from app.agent.graph import graph
 from app.agent.state import DataAgentState
 from app.core.audit import send_audit_log
 from app.core.cache import redis_cache
+from app.core.metrics import QUERY_TOTAL, QUERY_LATENCY, CACHE_HITS
 from app.core.context import request_id_ctx_var
 from app.core.log import logger
 
@@ -29,10 +30,13 @@ class QueryService:
     async def query(self, query: str, history: list = None, username: str = "anonymous"):
         start_time = time.time()
         request_id = request_id_ctx_var.get()
-        cache_key = f"{query}|{(history or [])[-1:]}"
+        import hashlib
+        last_history = history[-1] if history else ""
+        cache_key = hashlib.md5(f"{query}|{last_history}".encode()).hexdigest()
         cached = await redis_cache.get(cache_key)
         if cached:
             logger.info(f"Cache hit: {query[:30]}")
+            CACHE_HITS.inc()
             await send_audit_log(request_id, username, query, status="cache_hit",
                                  latency_ms=int((time.time() - start_time) * 1000))
             for line in cached:
@@ -77,5 +81,7 @@ class QueryService:
             yield err_line
         finally:
             latency = int((time.time() - start_time) * 1000)
+            QUERY_TOTAL.labels(status=status).inc()
+            QUERY_LATENCY.labels(status=status).observe(latency / 1000.0)
             await send_audit_log(request_id, username, query, sql=final_sql,
                                  status=status, latency_ms=latency, result_rows=result_rows)

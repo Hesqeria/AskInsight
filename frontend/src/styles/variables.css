@@ -1,0 +1,44 @@
+/* CSS Custom Properties - AskInsight Design System */
+:root {
+  --color-primary: #409eff;
+  --color-primary-light: #66b1ff;
+  --color-primary-dark: #3a8ee6;
+  --color-success: #67c23a;
+  --color-warning: #e6a23c;
+  --color-danger: #f56c6c;
+  --color-bg: #ffffff;
+  --color-bg-secondary: #f8f9fb;
+  --color-bg-tertiary: #f0f2f5;
+  --color-border: #e5e7eb;
+  --color-border-light: #ebeef5;
+  --color-text: #333333;
+  --color-text-secondary: #999999;
+  --color-text-muted: #c0c4cc;
+  --radius: 6px;
+  --radius-lg: 10px;
+  --radius-round: 999px;
+  --shadow-sm: 0 1px 4px rgba(0,0,0,0.06);
+  --shadow: 0 2px 12px rgba(0,0,0,0.08);
+  --shadow-lg: 0 10px 30px rgba(0,0,0,0.12);
+  --font-size-sm: 12px;
+  --font-size-base: 14px;
+  --font-size-lg: 16px;
+  --font-size-xl: 20px;
+  --font-size-2xl: 28px;
+  --transition: 0.2s ease;
+}
+
+[data-theme="dark"] {
+  --color-primary: #66b1ff;
+  --color-primary-light: #409eff;
+  --color-bg: #1a1a2e;
+  --color-bg-secondary: #16213e;
+  --color-bg-tertiary: #0f3460;
+  --color-border: #2a2a4a;
+  --color-border-light: #1a1a3e;
+  --color-text: #e0e0e0;
+  --color-text-secondary: #a0a0b0;
+  --shadow-sm: 0 1px 4px rgba(0,0,0,0.2);
+  --shadow: 0 2px 12px rgba(0,0,0,0.3);
+  --shadow-lg: 0 10px 30px rgba(0,0,0,0.4);
+}

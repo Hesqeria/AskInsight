@@ -8,6 +8,7 @@ from app.agent.context import DataAgentContext
 from app.agent.state import DataAgentState
 from app.agent.llm import llm
 from app.core.log import logger
+from app.core.metrics import SQL_GENERATED
 from app.core.sql_dialect import get_dialect_info
 from app.prompt.prompt_loader import load_prompt
 
@@ -274,6 +275,7 @@ async def generate_sql(state: DataAgentState, runtime: Runtime[DataAgentContext]
                     logger.info("两候选都返回'不存在'，取第一条")
 
         logger.info(f"最终 SQL: {final_sql[:120]}")
+        SQL_GENERATED.inc()
         return {"sql": final_sql}
     except Exception as e:
         logger.error(f"生成 SQL 异常: {e}")

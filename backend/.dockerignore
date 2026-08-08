@@ -6,3 +6,7 @@ logs/
 tests/
 .env
 .git
+
+*.pyo
+*.egg-info/
+.pytest_cache

@@ -1,7 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 const routes = [
-  { path: '/', name: 'Chat', component: () => import('../App.vue') },
+  { path: '/', name: 'Chat', component: () => import('../components/chat/ChatView.vue') },
+  { path: '/dashboard', name: 'Dashboard', component: () => import('../views/Dashboard.vue') },
   { path: '/schema', name: 'Schema', component: () => import('../views/Schema.vue') },
   { path: '/settings', name: 'Settings', component: () => import('../views/Settings.vue') },
   { path: '/admin', name: 'Admin', component: () => import('../views/admin/AdminLayout.vue') },

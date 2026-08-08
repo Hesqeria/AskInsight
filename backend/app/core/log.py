@@ -20,7 +20,15 @@ def inject_request_id(record):
         record["extra"]["request_id"] = "-"
 
 
+def _filter_secrets(record):
+    msg = record.get("message", "")
+    for keyword in ("api_key", "password", "token", "secret", "Authorization"):
+        if keyword.lower() in str(msg).lower():
+            record["message"] = "[REDACTED - contains sensitive data]"
+    return True
+
 logger.remove()
+logger = logger.patch(_filter_secrets)
 logger = logger.patch(inject_request_id)
 if app_config.logging.console.enable:
     logger.add(sink=sys.stdout, level=app_config.logging.console.level, format=log_format)

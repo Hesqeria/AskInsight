@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from typing import Optional
 
-from app.core.auth import verify_token
+from app.core.auth import require_admin
 from app.core.log import logger
 
 admin_router = APIRouter(prefix="/api/admin")
@@ -19,14 +19,14 @@ class LLMConfigSchema(BaseModel):
 
 
 @admin_router.get("/llm/providers")
-async def list_llm_providers(user: dict = Depends(verify_token)):
+async def list_llm_providers(user: dict = Depends(require_admin)):
     """列出支持的 LLM 服务商"""
     from app.agent.llm_provider import SUPPORTED_PROVIDERS
     return {"providers": list(SUPPORTED_PROVIDERS.keys())}
 
 
 @admin_router.post("/llm/switch")
-async def switch_llm(config: LLMConfigSchema, user: dict = Depends(verify_token)):
+async def switch_llm(config: LLMConfigSchema, user: dict = Depends(require_admin)):
     """切换 LLM 服务商（运行时）"""
     from app.agent.llm_provider import build_llm
     import app.agent.llm as llm_module
@@ -47,7 +47,7 @@ async def switch_llm(config: LLMConfigSchema, user: dict = Depends(verify_token)
 # === Dashboard 管理 ===
 
 @admin_router.get("/dashboards")
-async def list_dashboards(user: dict = Depends(verify_token)):
+async def list_dashboards(user: dict = Depends(require_admin)):
     """获取 Superset Dashboard 列表"""
     from app.services.superset_service import get_dashboards
     return {"dashboards": get_dashboards()}
@@ -59,7 +59,7 @@ class DashboardCreateSchema(BaseModel):
 
 
 @admin_router.post("/dashboard/create")
-async def create_dashboard(body: DashboardCreateSchema, user: dict = Depends(verify_token)):
+async def create_dashboard(body: DashboardCreateSchema, user: dict = Depends(require_admin)):
     """从查询结果创建 Superset Dashboard"""
     from app.services.superset_service import create_dashboard_from_queries
     result = create_dashboard_from_queries(body.title, body.queries)
@@ -74,7 +74,7 @@ class ChartRecSchema(BaseModel):
 
 
 @admin_router.post("/chart/recommend")
-async def recommend_chart(body: ChartRecSchema, user: dict = Depends(verify_token)):
+async def recommend_chart(body: ChartRecSchema, user: dict = Depends(require_admin)):
     """根据数据推荐图表类型（不调用 LLM，纯规则）"""
     from app.agent.nodes.chart_recommender import _detect_chart_heuristic
     chart_type = _detect_chart_heuristic(body.data)
@@ -88,7 +88,7 @@ class IncrementalUpdateSchema(BaseModel):
 @admin_router.post("/knowledge/incremental")
 async def incremental_update_knowledge(
     body: IncrementalUpdateSchema,
-    user: dict = Depends(verify_token),
+    user: dict = Depends(require_admin),
 ):
     """增量更新知识库（不全量重建）
 
@@ -102,8 +102,15 @@ async def incremental_update_knowledge(
     config_path = Path(__file__).parents[3] / "conf" / "meta_config.yaml"
 
     try:
+        async def _safe_incremental_update(config_path, table_name):
+            try:
+                await incremental_update(config_path, table_name)
+                logger.info('Incremental update completed')
+            except Exception as e:
+                logger.error(f'Incremental update failed: {e}')
+
         # 后台执行（不阻塞响应）
-        asyncio.create_task(incremental_update(config_path, body.table_name))
+        asyncio.create_task(_safe_incremental_update(config_path, body.table_name))
         return {
             "status": "started",
             "message": f"增量更新已启动 {'(表: ' + body.table_name + ')' if body.table_name else '(全部表)'}",
@@ -119,7 +126,7 @@ class StatsSchema(BaseModel):
 
 
 @admin_router.post("/api/admin/stats")
-async def run_stats(body: StatsSchema, user: dict = Depends(verify_token)):
+async def run_stats(body: StatsSchema, user: dict = Depends(require_admin)):
     """统计分析（内置函数，不调用 LLM）
 
     operation: describe/growth/breakdown/rank/correlation/cross
@@ -149,7 +156,7 @@ async def run_stats(body: StatsSchema, user: dict = Depends(verify_token)):
         return {"error": str(e)}
 
 @admin_router.post("/api/admin/schema/discover")
-async def discover_schema(db_name: str = "dw", user: dict = Depends(verify_token)):
+async def discover_schema(db_name: str = "dw", user: dict = Depends(require_admin)):
     """Auto-discover database schema and generate meta_config.
     
     Scans the specified database, detects table roles, FK columns,
@@ -173,7 +180,7 @@ async def discover_schema(db_name: str = "dw", user: dict = Depends(verify_token
         return {"status": "error", "message": str(e)}
 
 @admin_router.post("/api/admin/fewshot/generate")
-async def generate_fewshot(user: dict = Depends(verify_token)):
+async def generate_fewshot(user: dict = Depends(require_admin)):
     """Generate few-shot SQL examples from current meta_config."""
     from app.scripts.fewshot_generator import generate_fewshot_from_config, format_fewshot_prompt
     try:

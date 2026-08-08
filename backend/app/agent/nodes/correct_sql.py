@@ -8,6 +8,7 @@ from app.agent.state import DataAgentState
 from app.agent.llm import llm
 from app.agent.nodes.generate_sql import _clean_sql
 from app.core.log import logger
+from app.core.metrics import SQL_CORRECTED
 from app.prompt.prompt_loader import load_prompt
 
 
@@ -35,6 +36,7 @@ async def correct_sql(state: DataAgentState, runtime: Runtime[DataAgentContext])
             "sql": state.get("sql", ""),
         })
         logger.info("SQL correction done")
+        SQL_CORRECTED.inc()
         return {"sql": _clean_sql(sql), "error": None}
     except Exception as e:
         logger.error(f"SQL correction error: {e}")

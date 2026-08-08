@@ -6,7 +6,7 @@ import sys
 import bcrypt
 import jwt
 import logging
-from fastapi import HTTPException, Request
+from fastapi import Depends, HTTPException, Request
 
 from app.clients.redis_client_manager import redis_client_manager
 
@@ -66,6 +66,13 @@ async def create_token(username: str) -> str:
         except Exception as e:
             logger.warning(f"Redis session write failed, JWT-only mode: {e}")
     return token
+
+
+async def require_admin(user: dict = Depends(verify_token)) -> dict:
+    """FastAPI dependency: verify admin role."""
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return user
 
 
 async def verify_token(request: Request) -> dict:
