@@ -10,14 +10,14 @@ logging:
     level: INFO
 
 doris:
-  host: ${oc.env:DORIS_HOST,127.0.0.1}
+  host: ${oc.env:DORIS_HOST,192.168.137.52}
   port: 9030
   user: root
   password: ${oc.env:DORIS_PASSWORD,}
   database: dw
 
 milvus:
-  host: ${oc.env:MILVUS_HOST,127.0.0.1}
+  host: ${oc.env:MILVUS_HOST,192.168.137.50}
   port: 19530
   user: root
   password: ${oc.env:MILVUS_PASSWORD,}
@@ -31,7 +31,7 @@ embedding:
   model: ${oc.env:EMBEDDING_MODEL,text-embedding-v3}
 
 redis:
-  host: ${oc.env:REDIS_HOST,127.0.0.1}
+  host: ${oc.env:REDIS_HOST,192.168.137.51}
   port: 6379
   password: ${oc.env:REDIS_PASSWORD,}
 
@@ -41,9 +41,9 @@ superset:
   password: ${oc.env:SUPERSET_PASSWORD,}
 
 llm:
-  model_name: ${oc.env:LLM_MODEL_NAME,deepseek-chat}
+  model_name: ${oc.env:LLM_MODEL_NAME,deepseek-v4-pro}
   api_key: ${oc.env:LLM_API_KEY,}
-  base_url: ${oc.env:LLM_BASE_URL,https://api.deepseek.com}
+  base_url: ${oc.env:LLM_BASE_URL,http://re.94xy.cn/v1}
 
 pg:
   host: ${oc.env:PG_HOST,127.0.0.1}

@@ -2,87 +2,231 @@
   <div class="main-content">
     <div class="dashboard-header">
       <h2>Dashboard</h2>
-      <span class="card-count">{{ cards.length }} saved items</span>
-    </div>
-
-    <div v-if="cards.length === 0" class="empty-state">
-      <div class="empty-icon">AskInsight</div>
-      <p>No saved results yet. Ask a question in Chat and pin results here.</p>
-      <router-link to="/" class="go-chat">Go to Chat</router-link>
-    </div>
-
-    <div v-else class="card-grid">
-      <div v-for="card in cards" :key="card.id" class="dash-card">
-        <div class="dash-card-header">
-          <span class="dash-query">{{ card.query || 'No query' }}</span>
-          <button class="dash-close" @click="removeCard(card.id)">x</button>
-        </div>
-
-        <div v-if="card.type === 'card'" class="card-value">{{ card.value }}</div>
-
-        <div v-else-if="card.type === 'chart'" class="card-chart">
-          <ChartRenderer
-            :type="'bar'"
-            :category-key="card.categoryKey"
-            :value-keys="card.valueKeys"
-            :rows="card.rows"
-          />
-        </div>
-
-        <div v-else class="card-table">
-          <table class="mini-table">
-            <thead><tr><th v-for="col in (card.columns || []).slice(0, 4)" :key="col">{{ col }}</th></tr></thead>
-            <tbody>
-              <tr v-for="(row, i) in card.rows.slice(0, 3)" :key="i">
-                <td v-for="col in (card.columns || []).slice(0, 4)" :key="col">{{ row[col] }}</td>
-              </tr>
-            </tbody>
-          </table>
-          <div v-if="card.rows.length > 3" class="more-rows">+{{ card.rows.length - 3 }} more rows</div>
-        </div>
-
-        <div class="dash-time">{{ formatDate(card.timestamp) }}</div>
+      <div class="dashboard-actions">
+        <button class="btn" @click="showTemplates = true">
+          使用模板
+        </button>
+        <button class="btn primary" :disabled="!cards.length" @click="showAdd = true">
+          + 添加图表
+        </button>
+        <button class="btn" :disabled="!widgets.length" @click="exportDashboard">
+          导出 JSON
+        </button>
+        <label class="btn file-label">
+          导入 JSON
+          <input type="file" accept=".json" @change="importDashboard" />
+        </label>
+        <button class="btn" :disabled="!widgets.length" @click="exportPDF">
+          导出 PDF
+        </button>
       </div>
     </div>
+
+    <filter-bar v-model="filters" :columns="allColumns" @apply="onFilterApply" />
+
+    <div v-if="!widgets.length" class="empty-state">
+      <div class="empty-icon">AskInsight</div>
+      <p>暂无保存结果，前往对话后可将结果添加到看板，或使用模板快速创建。</p>
+      <div class="empty-actions">
+        <router-link to="/" class="go-chat">去对话</router-link>
+        <button class="btn" @click="showTemplates = true">使用模板</button>
+      </div>
+    </div>
+
+    <div v-else ref="gridContainer" class="grid-container">
+      <dashboard-grid
+        :widgets="widgets"
+        :rows="filteredRows"
+        @update:layout="onLayoutUpdate"
+        @config="openConfig"
+        @remove="removeWidget"
+        @drill-down="onDrillDown"
+      />
+    </div>
+
+    <add-widget-dialog v-model="showAdd" :rows="allRows" @add="addWidget" />
+
+    <el-dialog v-model="showConfig" title="图表配置" width="560px" destroy-on-close>
+      <chart-config-panel v-if="editingWidget" v-model="editingWidget.config" :rows="editingWidget.rows || allRows" @apply="onConfigApply" />
+      <template #footer>
+        <el-button size="small" @click="showConfig = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="showTemplates" title="选择 Dashboard 模板" width="640px" destroy-on-close>
+      <template-gallery @select="applyTemplate" />
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import ChartRenderer from '../components/chart/ChartRenderer.vue'
+import { ref, computed, nextTick } from 'vue'
+import DashboardGrid from '../components/dashboard/DashboardGrid.vue'
+import AddWidgetDialog from '../components/dashboard/AddWidgetDialog.vue'
+import ChartConfigPanel from '../components/chart/ChartConfigPanel.vue'
+import FilterBar from '../components/dashboard/FilterBar.vue'
+import TemplateGallery from '../components/dashboard/TemplateGallery.vue'
+import { useDashboardFilters } from '../composables/useDashboardFilters.js'
+import { useChartExport } from '../composables/useChartExport.js'
+import { useDashboardTemplates } from '../composables/useDashboardTemplates.js'
 
-const cards = ref(JSON.parse(localStorage.getItem('askinsight_dashboard') || '[]'))
-
-function removeCard(id) {
-  cards.value = cards.value.filter(c => c.id !== id)
-  localStorage.setItem('askinsight_dashboard', JSON.stringify(cards.value))
+const STORAGE_KEY = 'askinsight_dashboard'
+function loadCards() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
 }
 
-function formatDate(ts) {
-  if (!ts) return ''
-  return new Date(ts).toLocaleString()
+const cards = ref(loadCards())
+const showAdd = ref(false)
+const showConfig = ref(false)
+const showTemplates = ref(false)
+const editingWidget = ref(null)
+const filters = ref([])
+const gridContainer = ref(null)
+const { applyFilters } = useDashboardFilters()
+const { downloadDashboardPDF } = useChartExport()
+const { applyTemplate: getTemplateWidgets } = useDashboardTemplates()
+
+function normalizeCard(card, idx) {
+  const keys = card.columns || (card.rows?.length ? Object.keys(card.rows[0]) : [])
+  const categoryKey = card.config?.categoryKey || keys[0] || ''
+  const valueKeys = card.config?.valueKeys || keys.slice(1)
+  return {
+    ...card,
+    id: card.id || `${Date.now()}-${idx}`,
+    x: card.x ?? (idx % 2) * 6,
+    y: card.y ?? Math.floor(idx / 2) * 4,
+    w: card.w ?? 6,
+    h: card.h ?? 4,
+    config: {
+      title: card.config?.title || card.query || 'Saved result',
+      type: card.config?.type || (card.type === 'chart' ? 'bar' : card.type === 'card' ? 'big_number' : 'table'),
+      categoryKey,
+      valueKeys,
+    },
+    rows: card.rows || [],
+    layout: true,
+  }
+}
+
+const widgets = computed(() => cards.value.map(normalizeCard))
+const allRows = computed(() => widgets.value.flatMap(w => w.rows || []))
+const allColumns = computed(() => {
+  if (!allRows.value.length) return []
+  return Object.keys(allRows.value[0])
+})
+const filteredRows = computed(() => applyFilters(allRows.value, filters.value))
+
+let saveTimer = null
+function save() {
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = setTimeout(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(cards.value))
+    saveTimer = null
+  }, 300)
+}
+
+function addWidget(widget) {
+  cards.value = [...cards.value, widget]
+  save()
+}
+
+function removeWidget(widget) {
+  cards.value = cards.value.filter(c => String(c.id) !== String(widget.id))
+  save()
+}
+
+function openConfig(widget) {
+  editingWidget.value = widget
+  showConfig.value = true
+}
+
+function onConfigApply() {
+  const idx = cards.value.findIndex(c => String(c.id) === String(editingWidget.value?.id))
+  if (idx > -1) {
+    cards.value[idx] = { ...cards.value[idx], config: { ...editingWidget.value.config } }
+    save()
+  }
+  showConfig.value = false
+}
+
+function onFilterApply() {}
+
+function onLayoutUpdate(patch) {
+  let changed = false
+  cards.value = cards.value.map((card) => {
+    const p = patch[String(card.id)]
+    if (p && (card.x !== p.x || card.y !== p.y || card.w !== p.w || card.h !== p.h)) {
+      changed = true
+      return { ...card, x: p.x, y: p.y, w: p.w, h: p.h }
+    }
+    return card
+  })
+  if (changed) save()
+}
+
+function onDrillDown({ widget, field, value }) {
+  filters.value = [...filters.value, { field, operator: 'eq', value }]
+}
+
+function applyTemplate(key) {
+  const templateWidgets = getTemplateWidgets(key, allRows.value)
+  cards.value = [...cards.value, ...templateWidgets]
+  save()
+  showTemplates.value = false
+}
+
+function exportDashboard() {
+  const data = JSON.stringify(widgets.value, null, 2)
+  const blob = new Blob([data], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'askinsight-dashboard.json'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function importDashboard(e) {
+  const file = e.target.files?.[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = (ev) => {
+    try {
+      const data = JSON.parse(ev.target.result)
+      if (Array.isArray(data)) {
+        cards.value = data
+        save()
+      }
+    } catch {}
+  }
+  reader.readAsText(file)
+}
+
+async function exportPDF() {
+  await nextTick()
+  const widgetsEls = gridContainer.value?.querySelectorAll('.dashboard-widget') || []
+  await downloadDashboardPDF(Array.from(widgetsEls), 'askinsight-dashboard.pdf')
 }
 </script>
 
 <style scoped>
 .dashboard-header { display: flex; align-items: center; justify-content: space-between; padding: 24px 32px 16px; }
 .dashboard-header h2 { font-size: var(--font-size-xl); font-weight: 700; color: var(--color-text); margin: 0; }
-.card-count { font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+.dashboard-actions { display: flex; align-items: center; gap: 8px; }
+.btn { padding: 6px 14px; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-bg); color: var(--color-text); cursor: pointer; font-size: 13px; }
+.btn.primary { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.file-label { position: relative; overflow: hidden; display: inline-block; }
+.file-label input { position: absolute; left: -9999px; }
+.grid-container { padding: 16px 32px; }
 .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 50vh; gap: 12px; }
 .empty-icon { font-size: 40px; }
 .empty-state p { color: var(--color-text-secondary); font-size: var(--font-size-base); }
+.empty-actions { display: flex; gap: 12px; align-items: center; }
 .go-chat { padding: 8px 20px; border-radius: var(--radius); background: var(--color-primary); color: #fff; text-decoration: none; font-size: var(--font-size-base); }
-.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; padding: 16px 32px; }
-.dash-card { border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-bg); overflow: hidden; transition: box-shadow var(--transition); }
-.dash-card:hover { box-shadow: var(--shadow); }
-.dash-card-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--color-border-light); }
-.dash-query { font-size: 13px; color: var(--color-text); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
-.dash-close { border: none; background: none; cursor: pointer; color: var(--color-text-muted); font-size: 14px; padding: 2px 6px; }
-.card-chart { padding: 8px; height: 220px; }
-.card-table { padding: 8px; }
-.mini-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.mini-table th, .mini-table td { border: 1px solid var(--color-border-light); padding: 4px 8px; text-align: left; }
-.mini-table th { background: var(--color-bg-tertiary); }
-.more-rows { text-align: center; font-size: 11px; color: var(--color-text-secondary); padding: 4px; }
-.dash-time { padding: 8px 14px; font-size: 11px; color: var(--color-text-muted); border-top: 1px solid var(--color-border-light); }
 </style>

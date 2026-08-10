@@ -15,6 +15,9 @@ from app.api.routers.quality_router import quality_router
 from app.api.routers.docs_router import docs_router
 from app.api.routers.model_router import model_router
 from app.api.routers.lineage_router import lineage_router
+from app.api.routers.metadata_router import metadata_router
+from app.api.routers.alerts_router import alerts_router
+from app.api.routers.orchestrator_router import orchestrator_router
 from app.clients.doris_client_manager import doris_client_manager
 from app.clients.embedding_client_manager import embedding_client_manager
 from app.clients.milvus_client_manager import milvus_client_manager
@@ -59,6 +62,9 @@ app.include_router(quality_router)
 app.include_router(docs_router)
 app.include_router(model_router)
 app.include_router(lineage_router)
+app.include_router(metadata_router)
+app.include_router(alerts_router)
+app.include_router(orchestrator_router)
 
 
 @app.middleware("http")

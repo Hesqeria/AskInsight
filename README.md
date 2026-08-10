@@ -153,6 +153,9 @@ intelligent-decision-analytics/
 
 ## 📖 Documentation
 
+- **🚀 Quick-Start Implementation Case (EN)** → [`docs/case/DW-Implementation-Case-EN.md`](docs/case/DW-Implementation-Case-EN.md)
+- **🧭 Implementation Case Index** → [`docs/case/`](docs/case/README.md)
+- **🚀 数仓实施案例（中文）** → [`docs/case/DW-Implementation-Case-CN.md`](docs/case/DW-Implementation-Case-CN.md)
 - [Architecture Design](docs/architecture.md)
 - [API Docs](http://localhost:8000/docs)
 - [Configuration Guide](backend/conf/README.md)

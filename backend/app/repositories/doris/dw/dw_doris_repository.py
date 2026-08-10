@@ -21,13 +21,29 @@ class DwDorisRepository:
         result = await self.session.execute(text(f"DESCRIBE {safe_table}"))
         return {row.Field: row.Type for row in result.fetchall()}
 
-    async def get_column_values(self, table_name: str, column_name: str, limit: int = 10):
+    async def get_column_values(
+        self,
+        table_name: str,
+        column_name: str,
+        limit: int = 100,
+        offset: int = 0,
+        search: str = "",
+    ):
         safe_table = _safe_identifier(table_name)
         safe_col = _safe_identifier(column_name)
         safe_limit = min(max(int(limit), 1), 1000)
-        sql = f"SELECT DISTINCT {safe_col} FROM {safe_table} LIMIT {safe_limit}"
-        result = await self.session.execute(text(sql))
-        return result.scalars().fetchall()
+        safe_offset = max(int(offset), 0)
+        params = {"limit": safe_limit, "offset": safe_offset}
+        where_clause = ""
+        if search and str(search).strip():
+            where_clause = f"WHERE CAST({safe_col} AS STRING) LIKE :search"
+            params["search"] = f"%{str(search).strip()}%"
+        sql = (
+            f"SELECT DISTINCT {safe_col} AS value FROM {safe_table} "
+            f"{where_clause} ORDER BY value LIMIT :limit OFFSET :offset"
+        )
+        result = await self.session.execute(text(sql), params)
+        return [row["value"] for row in result.mappings().fetchall()]
 
     async def get_db_info(self):
         r = await self.session.execute(text("select version()"))

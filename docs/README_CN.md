@@ -89,6 +89,8 @@ AskInsight/
 
 ## 📖 文档
 
+- **🚀 数仓实施案例（中文）** → [`case/DW-Implementation-Case-CN.md`](case/DW-Implementation-Case-CN.md)
+- **🚀 Quick-Start Implementation Case (EN)** → [`case/DW-Implementation-Case-EN.md`](case/DW-Implementation-Case-EN.md)
 - [API 文档](http://localhost:8000/docs)
 - [英文 README](../README.md)
 - [企业场景分析](https://github.com/Hesqeria/AskInsight/blob/main/docs/)

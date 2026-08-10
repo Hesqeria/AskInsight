@@ -11,12 +11,18 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import AppSidebar from './components/layout/AppSidebar.vue'
 import { useHistory } from './composables/useHistory.js'
+import { useEchartsTheme } from './composables/useEchartsTheme.js'
 
 const { queryHistory, favQueries } = useHistory()
+const { watchTheme } = useEchartsTheme()
 const menuOpen = ref(false)
+let stopWatchTheme = null
+
+onMounted(() => { stopWatchTheme = watchTheme() })
+onUnmounted(() => stopWatchTheme?.())
 
 function onHistoryReplay(q) {
   menuOpen.value = false
