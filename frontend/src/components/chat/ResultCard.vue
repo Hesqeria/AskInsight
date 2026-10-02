@@ -35,9 +35,29 @@
     <div class="action-bar">
       <button class="action-btn" @click="copySQL" v-if="sql">Copy SQL</button>
       <button class="action-btn" @click="exportData">Export CSV</button>
+      <button v-if="spillId" class="action-btn primary" @click="openSpill">查看全量</button>
       <button class="action-btn" @click="emit('favorite')">{{ isFav ? 'Unstar' : 'Star' }}</button>
       <button class="action-btn primary" @click="emit('pin')">Pin to Dashboard</button>
     </div>
+
+    <el-dialog v-model="spillOpen" title="全量结果" width="80%">
+      <div class="spill-toolbar">
+        <span class="row-count">共 {{ spillTotal }} 行</span>
+        <div class="spill-pager">
+          <el-button size="small" :disabled="spillOffset <= 0" @click="spillPage(-1)">上一页</el-button>
+          <span>第 {{ spillPageNo }} 页</span>
+          <el-button size="small" :disabled="spillOffset + spillRows.length >= spillTotal" @click="spillPage(1)">下一页</el-button>
+        </div>
+      </div>
+      <table class="result-table">
+        <thead><tr><th v-for="c in columns" :key="c">{{ c }}</th></tr></thead>
+        <tbody>
+          <tr v-for="(row, i) in spillRows" :key="i">
+            <td v-for="c in columns" :key="c">{{ formatCell(row[c]) }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </el-dialog>
   </div>
 </template>
 
@@ -51,6 +71,8 @@ const props = defineProps({
   rows: { type: Array, default: () => [] },
   type: { type: String, default: 'table' },
   isFav: { type: Boolean, default: false },
+  spillId: { type: String, default: '' },
+  totalRows: { type: Number, default: 0 },
 })
 
 const emit = defineEmits(['favorite', 'pin'])
@@ -61,6 +83,41 @@ const sortCol = ref('')
 const sortAsc = ref(true)
 const page = ref(1)
 const pageSize = 20
+
+// M10 spill: "查看全量" paginated fetch from /api/v1/spills/{id}.
+const spillOpen = ref(false)
+const spillRows = ref([])
+const spillOffset = ref(0)
+const spillTotal = ref(0)
+const spillPageSize = 100
+const spillPageNo = computed(() => Math.floor(spillOffset.value / spillPageSize) + 1)
+
+async function openSpill() {
+  spillOpen.value = true
+  spillOffset.value = 0
+  await fetchSpill()
+}
+
+async function fetchSpill() {
+  try {
+    const token = localStorage.getItem('token') || ''
+    const resp = await fetch(
+      `/api/v1/spills/${props.spillId}?offset=${spillOffset.value}&limit=${spillPageSize}`,
+      { headers: token ? { Authorization: 'Bearer ' + token } : {} })
+    const body = await resp.json()
+    if (resp.ok && body.found) {
+      spillRows.value = body.rows || []
+      spillTotal.value = body.row_count || 0
+    }
+  } catch { /* keep last page */ }
+}
+
+async function spillPage(dir) {
+  const next = spillOffset.value + dir * spillPageSize
+  if (next < 0 || next >= spillTotal.value) return
+  spillOffset.value = next
+  await fetchSpill()
+}
 
 const filteredRows = computed(() => {
   let rows = props.rows

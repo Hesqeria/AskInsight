@@ -66,3 +66,45 @@ async def test_execute_filtered_sql_rejects_dangerous_sql():
         await service.execute_filtered_sql("DROP TABLE fact_order", [])
 
     dw_repo.execute_sql.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_execute_filtered_sql_skips_string_literals_when_injecting():
+    """Regression test: previously the filter injector matched
+    ` WHERE ` inside string literals (e.g. WHERE note = ' WHERE ...'),
+    producing malformed SQL. The injector must now scan outside
+    string literals only."""
+    from app.services.query_service import _find_keyword_outside_strings
+
+    # Real WHERE keyword outside any literal.
+    sql = "SELECT a FROM t WHERE b = 'foo WHERE bar'"
+    idx = _find_keyword_outside_strings(sql, " WHERE ")
+    assert idx != -1
+    assert sql[idx:idx + 7].upper() == " WHERE "
+    # The match must be the real WHERE (the one immediately after `t`),
+    # not the one inside the literal.
+    assert idx == sql.upper().index(" WHERE B")
+
+    # End-to-end: filter is injected at the real WHERE, not the literal.
+    dw_repo = AsyncMock()
+    dw_repo.execute_sql.return_value = []
+    service = QueryService(
+        embedding_client=None,
+        column_milvus_repository=None,
+        metric_milvus_repository=None,
+        value_doris_repository=None,
+        meta_doris_repository=None,
+        dw_doris_repository=dw_repo,
+    )
+    await service.execute_filtered_sql(
+        "SELECT note FROM t WHERE note = 'a WHERE b'",
+        [{"field": "note", "operator": "eq", "value": "x"}],
+    )
+    called_sql = dw_repo.execute_sql.call_args[0][0]
+    # The injected clause `(`NOTE` = :f0) AND` must appear BEFORE the
+    # existing predicate's value literal `'a WHERE b'`. Previously the
+    # injector matched the WHERE inside the literal and inserted there,
+    # corrupting the SQL.
+    injected_pos = called_sql.upper().index("(`NOTE` = :F0) AND")
+    literal_pos = called_sql.upper().index("'A WHERE B'")
+    assert injected_pos < literal_pos

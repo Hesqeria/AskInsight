@@ -23,6 +23,7 @@
 </template>
 
 <script>
+import { apiGet, apiPost } from '../../utils/api.js'
 export default {
   data() {
     return {
@@ -32,19 +33,15 @@ export default {
   },
   async mounted() {
     try {
-      const r = await fetch('/api/quality/stats', { headers: { Authorization: 'Bearer ' + localStorage.getItem('token') } });
-      this.stats = await r.json();
+      this.stats = await apiGet('/api/quality/stats');
     } catch (e) { /* stats optional */ }
   },
   methods: {
     async submit() {
       this.submitting = true; this.submitMsg = ''; this.submitError = false;
       try {
-        const r = await fetch('/api/feedback', {
-          method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('token') },
-          body: JSON.stringify(this.form),
-        });
-        const d = await r.json();
+          const d = await apiPost('/api/feedback', this.form);
+        
         this.submitError = d.status !== 'ok';
         this.submitMsg = d.message || d.status;
         if (d.status === 'ok') this.form = { query: '', wrong_sql: '', corrected_sql: '' };

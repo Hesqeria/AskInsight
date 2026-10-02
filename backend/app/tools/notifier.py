@@ -5,13 +5,17 @@ import time
 
 
 class Notifier:
+    # Severities that must bypass do-not-disturb windows. These represent
+    # escalations / critical incidents that operators must be woken for.
+    DND_BYPASS_SEVERITIES = {"P0", "critical"}
+
     def __init__(self, redis=None, retries=3):
         self.redis = redis
         self.retries = retries
         self._audit_log = []
 
     async def notify(self, channel, recipients, title, content, severity="info") -> None:
-        if self._in_do_not_disturb():
+        if self._in_do_not_disturb() and severity not in self.DND_BYPASS_SEVERITIES:
             return
         tasks = []
         for r in recipients:

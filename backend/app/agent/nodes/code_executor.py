@@ -30,17 +30,31 @@ ALLOWED_MODULES = {
     "collections", "itertools", "functools", "operator",
 }
 
-FORBIDDEN_IMPORTS = {"os", "subprocess", "socket", "shutil", "pty", "threading", "multiprocessing"}
-
 # Patterns that indicate injection attempts in LLM-generated code
 INJECTION_PATTERNS = [
     "'''", '"""', "__import__(", "compile(", "exec(", "eval(",
-    "importlib", "builtins", "getattr(",
+    "importlib", "builtins", "getattr(", "subclasses", "globals(",
+    "locals(", "vars(", "setattr(", "__class__", "__globals__",
+    "__builtins__", "__base__",
 ]
+
+# Direct builtin calls that must never appear (data arrives pre-loaded;
+# there is no legitimate reason for generated analysis code to touch files
+# or process state).
+FORBIDDEN_BUILTIN_CALLS = {
+    "open", "exec", "eval", "compile", "__import__", "input",
+    "globals", "locals", "vars", "setattr", "delattr", "breakpoint",
+}
 
 
 def validate_code(code: str) -> tuple:
-    """Security check for Python code via AST + pattern scanning."""
+    """Security check for Python code via AST + pattern scanning.
+
+    Layer 1: substring patterns (fast, catches obfuscation leftovers).
+    Layer 2: AST walk - import WHITELIST (not just denylist), builtin
+    call denylist, and dunder attribute access (classic sandbox escapes
+    via .__class__.__subclasses__() chains).
+    """
     for pattern in INJECTION_PATTERNS:
         if pattern in code:
             return False, f"Injection pattern detected: {repr(pattern)}"
@@ -54,19 +68,35 @@ def validate_code(code: str) -> tuple:
         if isinstance(node, ast.Import):
             for alias in node.names:
                 mod = alias.name.split(".")[0]
-                if mod in FORBIDDEN_IMPORTS:
-                    return False, f"Forbidden module import: {mod}"
+                if mod not in ALLOWED_MODULES:
+                    return False, f"Module not in whitelist: {mod}"
         if isinstance(node, ast.ImportFrom):
             mod = (node.module or "").split(".")[0]
-            if mod in FORBIDDEN_IMPORTS:
-                return False, f"Forbidden module import: {mod}"
+            if mod not in ALLOWED_MODULES:
+                return False, f"Module not in whitelist: {mod}"
+        if isinstance(node, ast.Attribute):
+            # dunder attribute access = sandbox escape hatch
+            # (.__class__, .__globals__, .__subclasses__, ...)
+            if node.attr.startswith("__") and not node.attr.endswith("__"):
+                pass  # name-mangled private attrs are harmless
+            elif node.attr.startswith("__") and node.attr.endswith("__"):
+                if node.attr not in ("__len__", "__iter__", "__next__",
+                                     "__str__", "__repr__", "__enter__",
+                                     "__exit__", "__call__", "__getitem__",
+                                     "__setitem__", "__add__", "__sub__",
+                                     "__mul__", "__div__", "__lt__", "__gt__",
+                                     "__eq__", "__contains__", "__format__"):
+                    return False, f"Dunder attribute access blocked: {node.attr}"
         if isinstance(node, ast.Call):
             func = node.func
             if isinstance(func, ast.Attribute):
                 if func.attr in ("system", "popen", "exec", "eval", "open"):
                     if isinstance(func.value, ast.Name):
-                        if func.value.id in ("os", "subprocess"):
+                        if func.value.id in ("os", "subprocess", "pathlib", "io"):
                             return False, f"Forbidden call to {func.value.id}.{func.attr}"
+            if isinstance(func, ast.Name):
+                if func.id in FORBIDDEN_BUILTIN_CALLS:
+                    return False, f"Forbidden builtin call: {func.id}"
 
     return True, "OK"
 
@@ -81,10 +111,23 @@ async def code_executor(state: DataAgentState, runtime: Runtime[DataAgentContext
       4. Return result
     """
     writer = runtime.stream_writer
+    from app.agent.nodes._analysis_gate import analysis_wanted
+    if not analysis_wanted(state):
+        logger.info("code_executor skipped (fast lane)")
+        writer({"stage": "Python Analysis (skipped)"})
+        return {"code_result": None}
     writer({"stage": "Python Analysis"})
     try:
         data = state.get("_last_result", [])
         query = state.get("query", "")
+        # M10 FR3: use the full spilled result when available.
+        try:
+            from app.services.spill_store import resolve_full_rows
+            meta_repo = runtime.context.get("meta_doris_repository")
+            if state.get("_spill_id") and meta_repo is not None:
+                data = await resolve_full_rows(state, meta_repo.session)
+        except Exception as e:
+            logger.debug(f"spill resolve in code_executor skipped: {e}")
 
         if not data or not isinstance(data, list):
             return {"code_result": None}

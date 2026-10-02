@@ -23,6 +23,7 @@
 </template>
 
 <script>
+import { apiGet, apiPost } from '../../utils/api.js'
 export default {
   data() {
     return {
@@ -41,10 +42,7 @@ export default {
     async discover() {
       this.discovering = true; this.discoverResult = null;
       try {
-        const r = await fetch('/api/admin/schema/discover?db_name=dw', {
-          method: 'POST', headers: { Authorization: 'Bearer ' + localStorage.getItem('token') },
-        });
-        this.discoverResult = await r.json();
+        this.discoverResult = await apiPost('/api/admin/schema/discover?db_name=dw', {});
       } catch (e) { this.discoverResult = { status: 'error', message: e.message }; }
       finally { this.discovering = false; }
     },

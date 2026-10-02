@@ -1,0 +1,32 @@
+{
+  "run_id": "20260811_193322_c24b20",
+  "model": "deepseek-v4-pro-postfix",
+  "results": [
+    {
+      "question_id": "EQ001",
+      "level1_intent": true,
+      "level2_executable": false,
+      "level3_ex": false,
+      "level4_llm_judge": false,
+      "level4_confidence": 0.0,
+      "level4_reason": "",
+      "final_pass": false,
+      "pred_sql": "",
+      "gold_rows": 1,
+      "pred_rows": 0,
+      "error_msg": "候选 SQL 为空",
+      "latency_ms": 24,
+      "match_reason": "",
+      "question": "昨天总 GMV 是多少",
+      "entity": "Order",
+      "sql_complexity": "Easy",
+      "bird_difficulty": "Simple",
+      "m1_schema_f1_table": 0.0,
+      "m1_schema_f1_col": 0.0,
+      "m3_ast_similarity": 0.0,
+      "m2_component_overall": 0.5,
+      "m2_component_select": 0.0,
+      "m2_component_where": 0.0
+    }
+  ]
+}

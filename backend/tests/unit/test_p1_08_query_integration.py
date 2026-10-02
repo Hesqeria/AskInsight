@@ -45,9 +45,21 @@ def test_is_data_query():
 
 def test_classify_intent_data_query_no_llm():
     from app.orchestrator.query_integration import classify_intent
-    intent, reply = asyncio.run(classify_intent("上周销售额是多少"))
+    intent, source = asyncio.run(classify_intent("上周销售额是多少"))
     assert intent == "data_query"
-    assert reply == ""
+    assert source == "data_hint"
+
+
+def test_classify_intent_data_query_short_circuits_hijack():
+    """Regression test: previously, queries like '各商品质量等级分布'
+    or '分析异常订单' were hijacked by substring keyword matching into
+    quality_check / anomaly_explain. The data-query fast-path must now
+    route them to data_query instead."""
+    from app.orchestrator.query_integration import classify_intent
+    for q in ["各商品质量等级分布", "分析异常订单", "订单下降原因统计"]:
+        intent, source = asyncio.run(classify_intent(q))
+        assert intent == "data_query", f"{q!r} -> {intent} (expected data_query)"
+        assert source == "data_hint"
 
 
 def test_classify_intent_etl_no_llm():

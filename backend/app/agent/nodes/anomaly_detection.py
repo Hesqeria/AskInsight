@@ -80,6 +80,9 @@ async def anomaly_detection(state: DataAgentState, runtime: Runtime[DataAgentCon
                 "message": f"Metric anomaly! Current value {current_val:.2f} deviates from baseline {avg:.2f} (Z={z_score:.2f})",
             }})
 
+        from app.agent.events import emit
+        emit("anomaly/detected", {"status": severity,
+                                  "z_score": round(z_score, 2)})
         return {"anomaly_status": severity, "anomaly_z_score": round(z_score, 2)}
     except Exception as e:
         logger.error(f"Anomaly detection error: {e}")
@@ -108,7 +111,7 @@ async def _record_baseline(repo, query: str, value: float, label: str):
     """Record a baseline data point"""
     try:
         await repo.session.execute(text("""
-            INSERT INTO metric_baseline (id, metric_query, metric_value, metric_label, recorded_at)
+            INSERT INTO data_agent.metric_baseline (id, metric_query, metric_value, metric_label, recorded_at)
             VALUES (:id, :q, :v, :l, :t)
         """), {
             "id": str(uuid.uuid4()),
@@ -126,7 +129,7 @@ async def _get_baselines(repo, query: str) -> list:
     """Fetch historical baseline"""
     try:
         result = await repo.session.execute(text("""
-            SELECT metric_value FROM metric_baseline
+            SELECT metric_value FROM data_agent.metric_baseline
             WHERE metric_query LIKE :q
             ORDER BY recorded_at DESC LIMIT 30
         """), {"q": f"%{query[:30]}%"})

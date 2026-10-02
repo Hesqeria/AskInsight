@@ -1,0 +1,51 @@
+{
+  "run_id": "20260812_151001_30140b",
+  "adapter": "llm",
+  "data_root": "D:/datasets/livesqlbench-base-lite-sqlite",
+  "time": "2026-08-12T15:11:00.006465",
+  "total": 2,
+  "passed": 0,
+  "success_rate": 0.0,
+  "by_category": {
+    "Query": {
+      "total": 2,
+      "passed": 0,
+      "rate": 0.0
+    }
+  },
+  "by_difficulty": {
+    "Moderate": {
+      "total": 2,
+      "passed": 0,
+      "rate": 0.0
+    }
+  },
+  "failures": [
+    {
+      "instance_id": "alien_1",
+      "question": "I want to analyze how the Signal-to-Noise Quality Indicator (SNQI) varies across different weather conditions. For each weather condition, give weather condition name, the average SNQI, the median SNQI, and count how many analyzable signals there are. Sort the result by average SNQI in descending order.",
+      "category": "Query",
+      "difficulty": "Moderate",
+      "ex_correct": false,
+      "pred_rows": 3,
+      "sol_rows": 3,
+      "error": "",
+      "match_reason": "mismatch",
+      "pred_sql": "WITH signal_snqi AS (\n  SELECT o.weathprofile,\n         s.snrratio - 0.1 * ABS(s.noisefloordbm) AS snqi\n  FROM signals s\n  JOIN telescopes t ON s.telescref = t.telescregistry\n  JOIN observatories o ON t.observstation = o.observstation\n),\nranked AS (\n  SELECT weathprofile,\n         snqi,\n         ROW_NUMBER() OVER (PARTITION BY weathprofile ORDER BY snqi) AS rn,\n         COUNT(*) OVER (PARTITION BY weathprofile) AS cnt\n  FROM signal_snqi\n)\nSELECT weathprofile AS Weather_Condition,\n       AVG(snqi) AS Avg_SNQI,\n       AVG(CASE \n             WHEN cnt % 2 = 1 AND rn = (cnt + 1) / 2 THEN snqi\n             WHEN cnt % 2 = 0 AND (rn = cnt/2 OR rn = cnt/2 + 1) THEN snqi\n             ELSE NULL\n           END) AS Median_SNQI,\n       SUM(CASE WHEN snqi > 0 THEN 1 ELSE 0 END) AS Analyzable_Count\nFROM ranked\nGROUP BY weathprofile\nORDER BY Avg_SNQI DESC;",
+      "sol_sql": "WITH signal_quality AS ( SELECT s.SignalRegistry, s.SnrRatio - 0.1 * ABS(s.NoiseFloorDbm) AS SNQI, o.WeathProfile FROM Signals s JOIN Telescopes t ON s.TelescRef = t.TelescRegistry JOIN Observatories o ON t.ObservStation = o.ObservStation ), ranked_quality AS ( SELECT WeathProfile, SNQI, ROW_NUMBER() OVER (PARTITION BY WeathProfile ORDER BY SNQI) as row_num, COUNT(*) OVER (PARTITION BY WeathProfile) as total_count FROM signal_quality ) SELECT WeathProfile, AVG(SNQI) AS avg_snqi, (SELECT SNQI FROM ranked_quality WHERE WeathProfile = rq.WeathProfile AND row_num = (total_count + 1) / 2) AS median_snqi, SUM(CASE WHEN SNQI > 0 THEN 1 ELSE 0 END) AS analyzable_signals FROM ranked_quality rq GROUP BY WeathProfile ORDER BY avg_snqi DESC;"
+    },
+    {
+      "instance_id": "alien_10",
+      "question": "I want to find signals that might contain structured information by analyzing their stability patterns. For each candidate, show the signal ID, signal type, Signal Stability Metric, one field that contains a combined stability textual report formatted exactly as: \"Frequency: <frequency stability>, Phase: <phase stability>, Integrity: <signal integrity>\" and the CIP Classification Label.",
+      "category": "Query",
+      "difficulty": "Moderate",
+      "ex_correct": false,
+      "pred_rows": 66,
+      "sol_rows": 1000,
+      "error": "",
+      "match_reason": "mismatch",
+      "pred_sql": "SELECT \n    s.SignalRegistry AS signal_id,\n    s.SignalClass AS signal_type,\n    ROUND(\n        (1 - ABS(s.FreqDriftHzs) / (NULLIF(s.FreqMhz * 1000, 0))) \n        * (s.SigDurSec / (1 + ABS(NULLIF(s.DoppShiftHz, 0)) / 1000.0)),\n        6\n    ) AS SSM,\n    'Frequency: ' || COALESCE(sd.FreqStab,'Unknown') || \n    ', Phase: ' || COALESCE(sd.PhaseStab,'Unknown') || \n    ', Integrity: ' || COALESCE(sd.SigIntegrity,'Unknown') AS stability_report,\n    CASE\n        WHEN (1 - ABS(s.FreqDriftHzs) / (NULLIF(s.FreqMhz * 1000, 0))) \n             * (s.SigDurSec / (1 + ABS(NULLIF(s.DoppShiftHz, 0)) / 1000.0)) > 0.8\n             AND sc.EntropyVal BETWEEN 0.4 AND 0.8\n             AND s.ModIndex > 0.5\n        THEN 'Coherent Information Pattern Detected'\n        WHEN (1 - ABS(s.FreqDriftHzs) / (NULLIF(s.FreqMhz * 1000, 0))) \n             * (s.SigDurSec / (1 + ABS(NULLIF(s.DoppShiftHz, 0)) / 1000.0)) > 0.6\n             AND sc.EntropyVal BETWEEN 0.3 AND 0.9\n        THEN 'Potential Information Pattern'\n        ELSE 'No Clear Pattern'\n    END AS CIP_label\nFROM signals s\nJOIN signaldynamics sd ON s.SignalRegistry = sd.SignalRef\nJOIN signalclassification sc ON s.SignalRegistry = sc.SignalRef\nWHERE CIP_label IN ('Coherent Information Pattern Detected', 'Potential Information Pattern');",
+      "sol_sql": "WITH stability_analysis AS ( SELECT s.SignalRegistry, s.SignalClass, s.FreqDriftHzs, s.FreqMhz, s.SigDurSec, s.DoppShiftHz, s.ModType, s.ModIndex, sd.SigIntegrity, sd.FreqStab, sd.PhaseStab, sc.EntropyVal, ((1 - ABS(s.FreqDriftHzs)/(s.FreqMhz * 1000)) * (s.SigDurSec/(1 + s.DoppShiftHz/1000))) AS SSM FROM Signals s INNER JOIN SignalDynamics sd ON s.SignalRegistry = sd.SignalRef INNER JOIN SignalClassification sc ON s.SignalRegistry = sc.SignalRef ), stability_attrs AS ( SELECT SignalRegistry, 'FreqStab' AS attribute, FreqStab AS value FROM stability_analysis UNION ALL SELECT SignalRegistry, 'PhaseStab' AS attribute, PhaseStab AS value FROM stability_analysis UNION ALL SELECT SignalRegistry, 'SigIntegrity' AS attribute, SigIntegrity AS value FROM stability_analysis ) SELECT sa.SignalRegistry, sa.SignalClass, ROUND(sa.SSM, 3) AS SSM, GROUP_CONCAT(CASE WHEN sa.attribute = 'FreqStab' THEN 'Frequency: ' || sa.value WHEN sa.attribute = 'PhaseStab' THEN 'Phase: ' || sa.value WHEN sa.attribute = 'SigIntegrity' THEN 'Integrity: ' || sa.value END, ', ') AS stability_factors, CASE WHEN sa.SSM > 0.8 AND sa.EntropyVal BETWEEN 0.4 AND 0.8 AND sa.ModIndex > 0.5 THEN 'Coherent Information Pattern Detected' WHEN sa.SSM > 0.6 AND sa.EntropyVal BETWEEN 0.3 AND 0.9 THEN 'Potential Information Pattern' ELSE 'No Clear Pattern' END AS pattern_assessment FROM ( SELECT sa.SignalRegistry, sa.SignalClass, sa.SSM, sa.EntropyVal, sa.ModType, sa.ModIndex, stability_attrs.attribute, stability_attrs.value FROM stability_analysis sa JOIN stability_attrs ON sa.SignalRegistry = stability_attrs.SignalRegistry ) AS sa GROUP BY sa.SignalRegistry, sa.SignalClass, sa.SSM, sa.EntropyVal, sa.ModType, sa.ModIndex;"
+    }
+  ]
+}

@@ -11,13 +11,9 @@ _cached_report = None
 
 
 def _load_table_infos() -> list:
-    from pathlib import Path
-    config_path = Path(__file__).parents[3] / "conf" / "meta_config_dw.yaml"
-    if not config_path.exists():
-        config_path = Path(__file__).parents[3] / "conf" / "meta_config.yaml"
-    with open(config_path, encoding="utf-8") as f:
-        config = yaml.safe_load(f)
-    return config.get("tables", [])
+    from app.conf.meta_config import load_meta_tables
+    return load_meta_tables()
+
 
 
 @readiness_router.get("/api/readiness")

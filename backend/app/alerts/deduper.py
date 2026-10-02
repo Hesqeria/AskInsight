@@ -31,10 +31,16 @@ class AlertDeduper:
     FINGERPRINT_KEYS = ["source", "title", "severity"]
     DEDUP_WINDOW_MINUTES = 5
     ESCALATE_THRESHOLD = 5
+    # Run a sweep of expired entries at most every N writes so the
+    # `_store` dict doesn't grow without bound in long-running
+    # processes. Sweeping on every write is wasteful when the dict is
+    # small; this batches the work.
+    _SWUP_INTERVAL = 64
 
     def __init__(self, redis=None):
         self.redis = redis
         self._store = {}
+        self._writes_since_sweep = 0
 
     async def process(self, alert) -> DedupedAlert:
         fp = self._fingerprint(alert)
@@ -92,6 +98,20 @@ class AlertDeduper:
             except Exception:
                 pass
         self._store[fp] = (value, time.time())
+        # Lazy GC: periodically drop expired entries so the dict can't
+        # grow unbounded when Redis isn't configured.
+        self._writes_since_sweep += 1
+        if self._writes_since_sweep >= self._SWUP_INTERVAL:
+            self._writes_since_sweep = 0
+            self._sweep_expired()
+
+    def _sweep_expired(self):
+        now = time.time()
+        cutoff = self.DEDUP_WINDOW_MINUTES * 60
+        expired = [fp for fp, (_v, ts) in self._store.items()
+                   if now - ts >= cutoff]
+        for fp in expired:
+            self._store.pop(fp, None)
 
 
 _deduper = None

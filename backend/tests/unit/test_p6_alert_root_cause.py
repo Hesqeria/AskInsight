@@ -134,9 +134,29 @@ def test_runbook_low_risk_auto_executes():
                  steps=[RunbookStep(1, "airflow_trigger", {"dag_id": "dag_etl_daily"}),
                         RunbookStep(2, "wait", {})])
     inc = Incident("inc-3", "t", "warning", ["u"], "t0")
-    res = asyncio.run(RunbookExecutor().execute(rb, inc))
+
+    async def verifier(_inc):
+        # Simulate the live alerting system confirming the alert cleared.
+        return True
+
+    res = asyncio.run(RunbookExecutor(incident_verifier=verifier).execute(rb, inc))
     assert res.status == "success"
     assert inc.status == "resolved"
+
+
+def test_runbook_partial_when_still_active():
+    """When no external verifier is wired and the incident is still
+    active, the runbook must NOT auto-mark it resolved (regression test
+    for the previously inverted `_verify_incident_resolved` check)."""
+    from app.agents.alert_root_cause_agent.runbook_executor import RunbookExecutor, Runbook, RunbookStep
+    from app.alerts.correlator import Incident
+    rb = Runbook("rb1b", "restart dag", risk_level="low_risk",
+                 steps=[RunbookStep(1, "airflow_trigger", {"dag_id": "dag_etl_daily"}),
+                        RunbookStep(2, "wait", {})])
+    inc = Incident("inc-3b", "t", "warning", ["u"], "t0")
+    res = asyncio.run(RunbookExecutor().execute(rb, inc))
+    assert res.status == "partial"
+    assert inc.status == "active"
 
 
 def test_runbook_high_risk_needs_approval():
@@ -165,3 +185,89 @@ def test_runbook_failed_step_rollback():
     inc = Incident("inc-5", "t", "warning", ["u"], "t0")
     res = asyncio.run(RunbookExecutor(scheduler=Boom()).execute(rb, inc))
     assert res.status == "failed"
+
+
+def test_analyzer_parses_llm_json():
+    """RootCauseAnalyzer must actually parse the LLM's JSON response
+    instead of discarding it (regression test for the dead-code _parse)."""
+    from app.agents.alert_root_cause_agent.analyzer import RootCauseAnalyzer
+    from app.alerts.correlator import Incident
+
+    class FakeLLM:
+        def complete(self, msgs, task_type=None, temperature=0):
+            return {"content": (
+                'Here is the analysis:\n'
+                '```json\n'
+                '{"root_cause": "Redis连接池耗尽", "confidence": 0.92,'
+                ' "suggested_fixes": ['
+                '{"description": "扩容连接池", "runbook_id": "rb_pool",'
+                ' "risk_level": "low_risk", "estimated_impact": "立即恢复"},'
+                '"重启服务"],'
+                ' "timeline": [{"t": 1700000000, "event": "drop observed"}]}\n'
+                '```')}
+
+    inc = Incident("inc-6", "GMV drop", "critical", ["u"], "t0")
+    report = asyncio.run(RootCauseAnalyzer(llm=FakeLLM()).analyze(inc))
+    assert report.root_cause == "Redis连接池耗尽"
+    assert report.confidence == 0.92
+    assert report.needs_review is False  # 0.92 >= 0.6
+    assert len(report.suggested_fixes) == 2
+    assert report.suggested_fixes[0].runbook_id == "rb_pool"
+    assert report.suggested_fixes[1].description == "重启服务"
+    assert report.suggested_fixes[1].runbook_id is None
+    assert report.timeline == [{"t": 1700000000, "event": "drop observed"}]
+
+
+def test_analyzer_falls_back_on_garbage_llm_output():
+    from app.agents.alert_root_cause_agent.analyzer import RootCauseAnalyzer
+    from app.alerts.correlator import Incident
+
+    class FakeLLM:
+        def complete(self, msgs, task_type=None, temperature=0):
+            return {"content": "sorry, I cannot help with that"}
+
+    inc = Incident("inc-7", "GMV drop", "critical", ["u"], "t0")
+    report = asyncio.run(RootCauseAnalyzer(llm=FakeLLM()).analyze(inc))
+    # Falls back to rule-based; still produces a usable report.
+    assert "data pipeline failure" in report.root_cause
+    assert report.confidence == 0.7
+
+
+def test_ingestor_bounded_buffer_evicts_oldest():
+    """`_ingested` must stay bounded in long-running processes."""
+    from app.alerts.ingestor import AlertIngestor, RawAlert
+    ing = AlertIngestor(max_ingested=3)
+    for i in range(5):
+        asyncio.run(ing.ingest(RawAlert(alert_id=f"a{i}", source="prometheus",
+                                        title="t", severity="warning",
+                                        starts_at="t0")))
+    buf = ing.get_ingested()
+    assert len(buf) == 3
+    # Oldest two were evicted.
+    assert buf[0]["alert_id"] == "a2"
+    assert buf[-1]["alert_id"] == "a4"
+
+
+def test_deduper_evicts_expired_entries():
+    """`_store` must not grow without bound when Redis is absent."""
+    from app.alerts.deduper import AlertDeduper
+    from app.alerts.ingestor import RawAlert
+    d = AlertDeduper()
+    d.DEDUP_WINDOW_MINUTES = 0  # expire immediately
+
+    # Push exactly _SWUP_INTERVAL entries. The last write triggers a
+    # sweep that drops every entry (all are now past their 0-minute TTL).
+    for i in range(d._SWUP_INTERVAL):
+        asyncio.run(d.process(RawAlert(alert_id=f"a{i}", source="src",
+                                       title=f"t{i}", severity="warning",
+                                       starts_at="t0")))
+    assert d._store == {}
+
+    # And a non-expiring deduper keeps its entries bounded only by the
+    # window - confirming the sweep only drops actually-expired ones.
+    d2 = AlertDeduper()
+    for i in range(d2._SWUP_INTERVAL + 10):
+        asyncio.run(d2.process(RawAlert(alert_id=f"b{i}", source="src",
+                                        title=f"u{i}", severity="warning",
+                                        starts_at="t0")))
+    assert len(d2._store) == d2._SWUP_INTERVAL + 10  # nothing expired

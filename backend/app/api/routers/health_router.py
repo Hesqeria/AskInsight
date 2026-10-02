@@ -4,6 +4,7 @@ from fastapi import APIRouter
 from fastapi.responses import PlainTextResponse
 
 from app.clients.milvus_client_manager import milvus_client_manager
+from app.clients.rerank_client_manager import rerank_client_manager
 from app.clients.redis_client_manager import redis_client_manager
 from app.conf.app_config import app_config
 
@@ -34,7 +35,15 @@ async def health():
     # 5. LLM (config check only, no request sent, P2-C3)
     checks["llm"] = "configured" if app_config.llm.api_key else "missing"
 
-    healthy_states = {"ok", "configured", "degraded"}
+    # 6. Rerank (optional component; config check only here, live probe
+    # lives at /health/rerank so a slow dashscope call doesn't drag the
+    # main health check).
+    checks["rerank"] = (
+        "configured" if rerank_client_manager.is_available()
+        else "disabled"
+    )
+
+    healthy_states = {"ok", "configured", "degraded", "disabled"}
     status_checks = {k: v for k, v in checks.items() if not k.endswith("_pool")}
     has_critical = any(v not in healthy_states for v in status_checks.values())
     status_code = 503 if has_critical else 200
@@ -43,6 +52,40 @@ async def health():
         status_code=status_code,
         content={"status": "unhealthy" if has_critical else "healthy", "checks": checks}
     )
+
+
+@health_router.get("/health/rerank")
+async def health_rerank():
+    """Live probe for the rerank service. Sends a tiny 1-doc call to
+    Bailian to verify api_key + model + network. Returns 200 on success,
+    503 on any failure (with the error message for debugging)."""
+    from fastapi.responses import JSONResponse
+    if not rerank_client_manager.is_available():
+        return JSONResponse(
+            status_code=200,
+            content={"status": "disabled",
+                     "note": "rerank not configured; pipeline falls back to RRF"},
+        )
+    try:
+        out = await rerank_client_manager.client.arerank(
+            "health check",
+            ["alive probe document"],
+            top_n=1,
+        )
+        ok = bool(out) and "relevance_score" in out[0]
+        return JSONResponse(
+            status_code=200 if ok else 503,
+            content={
+                "status": "ok" if ok else "degraded",
+                "model": app_config.rerank.model,
+                "score": out[0]["relevance_score"] if ok else None,
+            },
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "error": str(e)},
+        )
 
 
 @health_router.get("/metrics", response_class=PlainTextResponse)

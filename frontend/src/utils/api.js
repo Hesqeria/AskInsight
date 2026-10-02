@@ -10,7 +10,7 @@ async function request(url, options = {}) {
   const resp = await fetch(BASE + url, { ...options, headers })
   if (resp.status === 401) {
     localStorage.removeItem('token')
-    window.location.href = '/'
+    window.location.href = '/login'
     throw new Error('Session expired')
   }
   return resp
@@ -42,7 +42,7 @@ export async function apiStream(url, body) {
   if (!resp.ok) {
     if (resp.status === 401) {
       localStorage.removeItem('token')
-      window.location.href = '/'
+      window.location.href = '/login'
     }
     throw new Error(`HTTP ${resp.status}`)
   }

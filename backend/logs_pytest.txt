@@ -1,0 +1,57 @@
+........................................................................ [ 10%]
+........................................................................ [ 20%]
+........................................................................ [ 30%]
+........................................................................ [ 40%]
+........................................................................ [ 50%]
+........................................................................ [ 60%]
+........................................................................ [ 70%]
+........................................................................ [ 80%]
+........................................................................ [ 90%]
+.......................................................................  [100%]
+============================== warnings summary ===============================
+C:\Users\85246\miniconda3\Lib\site-packages\langgraph\checkpoint\base\__init__.py:17
+  C:\Users\85246\miniconda3\Lib\site-packages\langgraph\checkpoint\base\__init__.py:17: LangChainPendingDeprecationWarning: The default value of `allowed_objects` will change in a future version. Pass an explicit value (e.g., allowed_objects='messages' or allowed_objects='core') to suppress this warning.
+    from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
+
+C:\Users\85246\miniconda3\Lib\site-packages\omegaconf\grammar_visitor.py:253
+  C:\Users\85246\miniconda3\Lib\site-packages\omegaconf\grammar_visitor.py:253: UserWarning: In the sequence `DORIS_PASSWORD,` some elements are missing: please replace them with empty quoted strings. See https://github.com/omry/omegaconf/issues/572 for details.
+    warnings.warn(
+
+C:\Users\85246\miniconda3\Lib\site-packages\omegaconf\grammar_visitor.py:253
+  C:\Users\85246\miniconda3\Lib\site-packages\omegaconf\grammar_visitor.py:253: UserWarning: In the sequence `MILVUS_PASSWORD,` some elements are missing: please replace them with empty quoted strings. See https://github.com/omry/omegaconf/issues/572 for details.
+    warnings.warn(
+
+C:\Users\85246\miniconda3\Lib\site-packages\omegaconf\grammar_visitor.py:253
+  C:\Users\85246\miniconda3\Lib\site-packages\omegaconf\grammar_visitor.py:253: UserWarning: In the sequence `EMBEDDING_BASE_URL,` some elements are missing: please replace them with empty quoted strings. See https://github.com/omry/omegaconf/issues/572 for details.
+    warnings.warn(
+
+C:\Users\85246\miniconda3\Lib\site-packages\omegaconf\grammar_visitor.py:253
+  C:\Users\85246\miniconda3\Lib\site-packages\omegaconf\grammar_visitor.py:253: UserWarning: In the sequence `EMBEDDING_API_KEY,` some elements are missing: please replace them with empty quoted strings. See https://github.com/omry/omegaconf/issues/572 for details.
+    warnings.warn(
+
+C:\Users\85246\miniconda3\Lib\site-packages\omegaconf\grammar_visitor.py:253
+  C:\Users\85246\miniconda3\Lib\site-packages\omegaconf\grammar_visitor.py:253: UserWarning: In the sequence `DASHSCOPE_API_KEY,` some elements are missing: please replace them with empty quoted strings. See https://github.com/omry/omegaconf/issues/572 for details.
+    warnings.warn(
+
+C:\Users\85246\miniconda3\Lib\site-packages\omegaconf\grammar_visitor.py:253
+  C:\Users\85246\miniconda3\Lib\site-packages\omegaconf\grammar_visitor.py:253: UserWarning: In the sequence `REDIS_PASSWORD,` some elements are missing: please replace them with empty quoted strings. See https://github.com/omry/omegaconf/issues/572 for details.
+    warnings.warn(
+
+C:\Users\85246\miniconda3\Lib\site-packages\omegaconf\grammar_visitor.py:253
+  C:\Users\85246\miniconda3\Lib\site-packages\omegaconf\grammar_visitor.py:253: UserWarning: In the sequence `SUPERSET_PASSWORD,` some elements are missing: please replace them with empty quoted strings. See https://github.com/omry/omegaconf/issues/572 for details.
+    warnings.warn(
+
+C:\Users\85246\miniconda3\Lib\site-packages\omegaconf\grammar_visitor.py:253
+  C:\Users\85246\miniconda3\Lib\site-packages\omegaconf\grammar_visitor.py:253: UserWarning: In the sequence `LLM_API_KEY,` some elements are missing: please replace them with empty quoted strings. See https://github.com/omry/omegaconf/issues/572 for details.
+    warnings.warn(
+
+C:\Users\85246\miniconda3\Lib\site-packages\omegaconf\grammar_visitor.py:253
+  C:\Users\85246\miniconda3\Lib\site-packages\omegaconf\grammar_visitor.py:253: UserWarning: In the sequence `PG_PASSWORD,` some elements are missing: please replace them with empty quoted strings. See https://github.com/omry/omegaconf/issues/572 for details.
+    warnings.warn(
+
+C:\Users\85246\miniconda3\Lib\site-packages\omegaconf\grammar_visitor.py:253
+  C:\Users\85246\miniconda3\Lib\site-packages\omegaconf\grammar_visitor.py:253: UserWarning: In the sequence `MYSQL_PASSWORD,` some elements are missing: please replace them with empty quoted strings. See https://github.com/omry/omegaconf/issues/572 for details.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+719 passed, 11 warnings in 16.92s

@@ -43,10 +43,21 @@ class ToolRegistry:
                 for t in self._tools.values()
                 if self._role_allowed(t.required_role, role)]
 
-    def invoke(self, name: str, params: dict) -> dict:
+    def invoke(self, name: str, params: dict, role: str = "L1_business") -> dict:
+        """Invoke a registered tool. `role` is the caller's role and is
+        enforced against the tool's `required_role`. Previously the
+        role check was only applied in `list_tools`, so any caller could
+        invoke `execute_sql` (DDL/DML on Doris) directly. The role must
+        now be supplied by every caller; defaulting to the lowest role
+        makes accidental privilege escalation impossible.
+        """
         tool = self._tools.get(name)
         if not tool:
             return {"error": f"Tool '{name}' not found"}
+        if not self._role_allowed(tool.required_role, role):
+            return {"error": f"Permission denied: tool '{name}' requires "
+                             f"role '{tool.required_role}', caller has '{role}'",
+                    "ok": False}
         try:
             result = tool.handler(params)
             return {"tool": name, "result": result, "ok": True}

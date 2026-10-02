@@ -1,5 +1,6 @@
 """P6-01: Multi-source alert ingestion - unified RawAlert schema."""
 import uuid
+from collections import deque
 
 
 class AlertSource:
@@ -34,14 +35,23 @@ class RawAlert:
 
 
 class AlertIngestor:
-    def __init__(self, doris=None, kafka=None, deduper=None):
+    # Default cap on the in-memory recent-ingestion buffer. Production
+    # deployments back this with Doris; the in-process buffer exists
+    # only for recent-fanout reads and must not grow unbounded.
+    DEFAULT_MAX_INGESTED = 1000
+
+    def __init__(self, doris=None, kafka=None, deduper=None,
+                 max_ingested: int = DEFAULT_MAX_INGESTED):
         self.doris = doris
         self.kafka = kafka
         self.deduper = deduper
-        self._ingested = []
+        self._max_ingested = max(1, int(max_ingested))
+        self._ingested = deque(maxlen=self._max_ingested)
 
     async def ingest(self, alert: RawAlert) -> str:
         alert_uid = uuid.uuid4().hex
+        # deque(maxlen=...) auto-evicts the oldest entry when full, so
+        # this no longer leaks memory in long-running processes.
         self._ingested.append({**alert.to_dict(), "alert_uid": alert_uid})
         if self.doris is not None:
             try:

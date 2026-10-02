@@ -63,5 +63,10 @@ async def execute_sql(
     service: QueryService = Depends(get_query_service),
 ):
     filters = [f.model_dump() for f in body.filters]
-    rows = await service.execute_filtered_sql(body.sql, filters)
+    try:
+        rows = await service.execute_filtered_sql(body.sql, filters)
+    except ValueError as e:
+        # Guard-chain rejection (forbidden keyword / unsafe SQL) is a
+        # client error, not a 500.
+        return JSONResponse(status_code=400, content={"error": str(e)})
     return JSONResponse({"rows": rows})

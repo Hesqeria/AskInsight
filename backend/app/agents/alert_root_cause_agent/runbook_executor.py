@@ -37,12 +37,19 @@ class ExecutionResult:
 
 
 class RunbookExecutor:
-    def __init__(self, scheduler=None, notifier=None, doris=None, ssh=None, approvals=None):
+    def __init__(self, scheduler=None, notifier=None, doris=None, ssh=None,
+                 approvals=None, incident_verifier=None):
+        """`incident_verifier` is an optional async callable that takes an
+        Incident and returns True if the incident is genuinely resolved
+        (e.g. by re-querying the live alerting system). When None, the
+        executor falls back to checking `incident.status` directly.
+        """
         self.scheduler = scheduler
         self.notifier = notifier
         self.doris = doris
         self.ssh = ssh
         self.approvals = approvals
+        self.incident_verifier = incident_verifier
         self._steps_run = []
 
     async def execute(self, runbook, incident, context=None) -> ExecutionResult:
@@ -110,9 +117,17 @@ class RunbookExecutor:
                               parameters=action.get("parameters", {}))
         await self._run_step(rb_step, None)
 
-    @staticmethod
-    async def _verify_incident_resolved(incident):
-        return incident.status == "active"
+    async def _verify_incident_resolved(self, incident):
+        # Prefer an external verifier that re-queries the live alerting
+        # system; otherwise fall back to the incident's current status.
+        # An incident is considered resolved only when its status is no
+        # longer "active" (e.g. "resolved", "closed"). Previously this
+        # check was inverted (`== "active"`), which caused every
+        # successful runbook to mark the incident resolved regardless of
+        # the actual outcome.
+        if self.incident_verifier is not None:
+            return bool(await self.incident_verifier(incident))
+        return incident.status != "active"
 
 
 _executor = None

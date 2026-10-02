@@ -10,28 +10,48 @@ logging:
     level: INFO
 
 doris:
-  host: ${oc.env:DORIS_HOST,192.168.137.52}
+  host: ${oc.env:DORIS_HOST,127.0.0.1}
   port: 9030
   user: root
   password: ${oc.env:DORIS_PASSWORD,}
   database: dw
 
 milvus:
-  host: ${oc.env:MILVUS_HOST,192.168.137.50}
+  host: ${oc.env:MILVUS_HOST,127.0.0.1}
   port: 19530
   user: root
   password: ${oc.env:MILVUS_PASSWORD,}
   embedding_size: 1024
-  column_collection: data-agent-column
-  metric_collection: data-agent-metric
+  column_collection: data_agent_column
+  metric_collection: data_agent_metric
 
 embedding:
   api_base: ${oc.env:EMBEDDING_BASE_URL,}
   api_key: ${oc.env:EMBEDDING_API_KEY,}
   model: ${oc.env:EMBEDDING_MODEL,text-embedding-v3}
 
+rerank:
+  api_key: ${oc.env:RERANK_API_KEY,${oc.env:DASHSCOPE_API_KEY,}}
+  model: ${oc.env:RERANK_MODEL,gte-rerank-v2}
+  # When empty/unset, rerank is disabled and the merge node falls back
+  # to pure RRF ordering.
+  enabled: ${oc.env:RERANK_ENABLED,true}
+  # Number of candidates (after RRF) to feed into the reranker. Larger
+  # is more thorough but slower/costlier; 50 covers more of the schema
+  # so the LLM sees the columns gold SQL needs (baseline: 54% of EX
+  # failures were missing/wrong SELECT columns, so wider recall pays off).
+  top_n: ${oc.env:RERANK_TOP_N,50}
+  # Drop reranked docs whose score is below this. Empirical smoke test
+  # against gte-rerank-v2 showed relevant cols score >= 0.8 while noise
+  # cols score < 0.1, so 0.1 cleanly filters noise without losing recall.
+  score_threshold: ${oc.env:RERANK_SCORE_THRESHOLD,0.1}
+  # Cache TTL in seconds for rerank results (key = hash(query + docs)).
+  # Metadata is mostly stable, so caching saves cost+latency on repeats.
+  # Set to 0 to disable caching.
+  cache_ttl: ${oc.env:RERANK_CACHE_TTL,3600}
+
 redis:
-  host: ${oc.env:REDIS_HOST,192.168.137.51}
+  host: ${oc.env:REDIS_HOST,127.0.0.1}
   port: 6379
   password: ${oc.env:REDIS_PASSWORD,}
 
@@ -41,9 +61,9 @@ superset:
   password: ${oc.env:SUPERSET_PASSWORD,}
 
 llm:
-  model_name: ${oc.env:LLM_MODEL_NAME,deepseek-v4-pro}
+  model_name: ${oc.env:LLM_MODEL_NAME,deepseek-chat}
   api_key: ${oc.env:LLM_API_KEY,}
-  base_url: ${oc.env:LLM_BASE_URL,http://re.94xy.cn/v1}
+  base_url: ${oc.env:LLM_BASE_URL,https://api.deepseek.com}
 
 pg:
   host: ${oc.env:PG_HOST,127.0.0.1}
@@ -58,3 +78,15 @@ mysql:
   user: root
   password: ${oc.env:MYSQL_PASSWORD,}
   database: test
+
+# M7 审批策略(PRD 05-DeepSeek-Harness研究)
+# mode: ask = 触发时建工单等待人工;never = 严格模式直接拒绝(fail-closed)
+approval:
+  mode: ask
+  expire_hours: 72
+  roles:
+    admin:
+      auto_approve: true   # TEMP: boundary test, restored after
+    L3_engineer:
+      max_pii_without_approval: 3
+    # 未列出的角色(如 L1/user)默认全审(ask)

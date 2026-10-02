@@ -21,16 +21,15 @@
 </template>
 
 <script>
+import { apiPost } from '../../utils/api.js'
 export default {
   data() { return { loading: false, message: '' } },
   methods: {
     async rebuild() {
       this.loading = true; this.message = '';
       try {
-        const r = await fetch('/api/admin/knowledge/incremental', {
-          method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('token') }, body: '{}',
-        });
-        const d = await r.json();
+        const d = await apiPost('/api/admin/knowledge/incremental', {});
+        
         this.message = d.message || d.status || 'Started';
       } catch (e) { this.message = 'Request failed: ' + e.message; }
       finally { this.loading = false; }

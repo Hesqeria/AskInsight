@@ -28,32 +28,25 @@
   </div>
 </template>
 <script>
+import { apiGet, apiPost } from '../../utils/api.js'
 export default {
   data(){return{templates:[],runs:[],running:null,progress:[],runState:'',activeName:'',activeRunId:null}},
   async mounted(){await this.load()},
   methods:{
     async load(){
-      const r=await fetch('/api/pipelines',{headers:{Authorization:'Bearer '+localStorage.getItem('token')}})
-      const d=await r.json()
+      const d=await apiGet('/api/pipelines')
       this.templates=d.templates||[];this.runs=d.runs||[]
     },
     async run(name){
       this.running=name;this.activeName=name;this.progress=[]
-      const r=await fetch('/api/pipelines/'+name+'/run',{
-        method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+localStorage.getItem('token')},
-        body:JSON.stringify({query:''})
-      })
-      const d=await r.json()
+      const d=await apiPost('/api/pipelines/'+name+'/run', {query:''})
       this.runState=d.state;this.activeRunId=d.run_id
       if(d.outputs) this.progress=Object.keys(d.outputs).map(k=>({node:k,state:'DONE',progress:100}))
       this.running=null
     },
     async resumeRun(){
       if(!this.activeRunId)return
-      const r=await fetch('/api/pipelines/runs/'+this.activeRunId+'/resume',{
-        method:'POST',headers:{Authorization:'Bearer '+localStorage.getItem('token')}
-      })
-      const d=await r.json()
+      const d=await apiPost('/api/pipelines/runs/'+this.activeRunId+'/resume', {})
       this.runState=d.state
       if(d.outputs) this.progress=Object.keys(d.outputs).map(k=>({node:k,state:'DONE',progress:100}))
     }

@@ -45,6 +45,11 @@ export function useCharts() {
     return {
       tooltip: { trigger: 'axis' },
       legend: { top: 0, type: 'scroll', textStyle: { fontSize: 12 } },
+      // one-click PNG export (pandas-ai #174/#212/#323 chart-save pain)
+      toolbox: {
+        feature: { saveAsImage: { title: '保存为图片', name: 'AskInsight图表' } },
+        right: 8,
+      },
       grid: { left: 50, right: 20, top: 40, bottom: 50 },
     }
   }
@@ -89,6 +94,10 @@ export function useCharts() {
     return {
       tooltip: { trigger: 'item' },
       legend: { top: 0, type: 'scroll' },
+      toolbox: {
+        feature: { saveAsImage: { title: '保存为图片', name: 'AskInsight图表' } },
+        right: 8,
+      },
       series: [{
         type: 'pie',
         name: valueKey,

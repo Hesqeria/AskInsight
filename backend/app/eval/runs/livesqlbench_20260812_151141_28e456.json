@@ -1,0 +1,29 @@
+{
+  "run_id": "20260812_151141_28e456",
+  "adapter": "mock",
+  "data_root": "D:/datasets/livesqlbench-base-lite-sqlite",
+  "time": "2026-08-12T15:11:41.317740",
+  "total": 10,
+  "passed": 10,
+  "success_rate": 1.0,
+  "by_category": {
+    "Query": {
+      "total": 10,
+      "passed": 10,
+      "rate": 1.0
+    }
+  },
+  "by_difficulty": {
+    "Moderate": {
+      "total": 7,
+      "passed": 7,
+      "rate": 1.0
+    },
+    "Simple": {
+      "total": 3,
+      "passed": 3,
+      "rate": 1.0
+    }
+  },
+  "failures": []
+}

@@ -1,549 +1,1767 @@
 tables:
-- name: dim_user_info
-  role: dim
-  description: User dimension table; includes login name/nickname/phone/membership level/birthday/gender.
-  columns:
-  - name: id
-    role: primary_key
-    description: User ID.
-    alias: [用户ID, 客户ID, user_id]
-    sync: false
-  - name: login_name
-    role: dimension
-    description: Login name.
-    alias: [登录名, 账号, login_name]
-    sync: true
-  - name: nick_name
-    role: dimension
-    description: Nickname.
-    alias: [昵称, 用户昵称, nickname]
-    sync: true
-  - name: name
-    role: dimension
-    description: Real name.
-    alias: [姓名, 用户名, name]
-    sync: true
-  - name: phone_num
-    role: dimension
-    description: Phone number.
-    alias: [手机, 电话, phone]
-    sync: false
-  - name: user_level
-    role: dimension
-    description: Membership level (1:Regular 2:Silver 3:Gold 4:Diamond 5:Black Gold).
-    alias: [等级, 会员等级, user_level]
-    sync: true
-  - name: gender
-    role: dimension
-    description: Gender (M:Male F:Female).
-    alias: [性别, gender]
-    sync: true
-  - name: birthday
-    role: dimension
-    description: Birthday.
-    alias: [生日, birthday]
-    sync: false
-- name: dim_sku_info
-  role: dim
-  description: Product (SKU) dimension table; includes SKU name/price/brand/category (degenerate dimension).
-  columns:
-  - name: id
-    role: primary_key
-    description: SKU product ID.
-    alias: [商品ID, SKUID, sku_id]
-    sync: false
-  - name: sku_name
-    role: dimension
-    description: Product name.
-    alias: [商品名, 产品名, sku_name]
-    sync: true
-  - name: price
-    role: measure
-    description: Listed price (excluding discounts; caliber: SKU original price).
-    alias: [价格, 单价, price]
-    sync: false
-  - name: tm_name
-    role: dimension
-    description: Brand name (trademark name; source: dim_base_trademark).
-    alias: [品牌, brand]
-    sync: true
-  - name: category3_name
-    role: dimension
-    description: Level-3 category name.
-    alias: [分类, 品类, 三级分类, category3]
-    sync: true
-  - name: category2_name
-    role: dimension
-    description: Level-2 category name.
-    alias: [二级分类, category2]
-    sync: true
-  - name: category1_name
-    role: dimension
-    description: Level-1 category name.
-    alias: [一级分类, 大类, category1]
-    sync: true
-- name: dim_base_province
-  role: dim
-  description: Province dimension table; includes province name/macro-region/region code.
-  columns:
-  - name: id
-    role: primary_key
-    description: Province ID.
-    alias: [省份ID, province_id]
-    sync: false
-  - name: name
-    role: dimension
-    description: Province name.
-    alias: [省份, 省, province]
-    sync: true
-  - name: region_name
-    role: dimension
-    description: Macro-region name (East/South/North/Central/Southwest/Northwest/Northeast China, HK/Macau/Taiwan, Overseas).
-    alias: [大区, 地区, 区域, region]
-    sync: true
-- name: dim_date
-  role: dim
-  description: Date dimension table; includes date/week/month/quarter/holiday.
+- name: ads_gmv_total_day
+  role: fact
+  description: ADS-每日 GMV
   columns:
   - name: dt
-    role: primary_key
-    description: Date (yyyy-MM-dd).
-    alias: [日期, date]
+    role: dimension
+    description: 日期（分区主键），格式YYYY-MM-DD，如2026-08-07
+    alias: []
     sync: false
-  - name: year
-    role: dimension
-    description: Year.
-    alias: [年, year]
-    sync: false
-  - name: quarter
-    role: dimension
-    description: Quarter.
-    alias: [季度, quarter]
-    sync: true
-  - name: month
-    role: dimension
-    description: Month.
-    alias: [月, month]
-    sync: false
-  - name: week
-    role: dimension
-    description: Week number.
-    alias: [周, week]
-    sync: false
-- name: dim_coupon_info
-  role: dim
-  description: Coupon dimension table; includes coupon name/type/face value/validity.
-  columns:
-  - name: id
-    role: primary_key
-    description: Coupon ID.
-    alias: [券ID, coupon_id]
-    sync: false
-  - name: coupon_name
-    role: dimension
-    description: Coupon name.
-    alias: [券名, 优惠券, coupon_name]
-    sync: true
-  - name: coupon_type
-    role: dimension
-    description: Coupon type.
-    alias: [类型, coupon_type]
-    sync: true
-  - name: benefit_amount
+  - name: gmv
     role: measure
-    description: Discount amount.
-    alias: [面额, 折扣, discount_amount]
+    description: GMV成交总额=当日已支付订单的金额合计（SUM(total_amount) WHERE order_status='1001'）。问GMV/营收/销售额用此字段
+    alias: []
     sync: false
-- name: dim_activity_info
-  role: dim
-  description: Activity dimension table; includes activity name/type/time.
+  - name: order_count
+    role: measure
+    description: 订单数=当日已支付订单总数（COUNT WHERE order_status='1001'）。问订单数/订单量/订单笔数用此字段
+    alias: []
+    sync: false
+  - name: payer_count
+    role: measure
+    description: 支付用户数=当日已支付的去重用户数（COUNT DISTINCT user_id WHERE order_status='1001'）
+    alias: []
+    sync: false
+  - name: avg_order_amount
+    role: measure
+    description: 客单价/平均订单金额=当日GMV除以当日订单数（SUM(total_amount)/COUNT(1) WHERE order_status='1001'）。问平均金额/客单价用此字段
+    alias: []
+    sync: false
+- name: ads_user_repurchase
+  role: fact
+  description: ADS-用户复购率
   columns:
-  - name: id
-    role: primary_key
-    description: Activity ID.
-    alias: [活动ID, activity_id]
+  - name: dt
+    role: dimension
+    description: 日期
+    alias: []
+    sync: false
+  - name: total_user_count
+    role: measure
+    description: 截止当日累计支付用户总数（去重）
+    alias: []
+    sync: false
+  - name: repurchase_user_count
+    role: measure
+    description: 截止当日累计支付>=2次的用户数
+    alias: []
+    sync: false
+  - name: repurchase_rate
+    role: measure
+    description: 复购率=复购用户数除以总用户数（repurchase_user_count/total_user_count）
+    alias: []
+    sync: false
+- name: ads_user_retention_day
+  role: fact
+  description: ADS-用户留存率
+  columns:
+  - name: register_date
+    role: dimension
+    description: 注册日期（用户首次注册日）
+    alias: []
+    sync: false
+  - name: retention_day
+    role: dimension
+    description: 留存天数（第1/2/3/7日留存）
+    alias: []
+    sync: false
+  - name: dt
+    role: dimension
+    description: 统计日期
+    alias: []
+    sync: false
+  - name: register_count
+    role: measure
+    description: 注册日当天注册用户数
+    alias: []
+    sync: false
+  - name: retention_count
+    role: measure
+    description: 留存日仍在活跃的用户数
+    alias: []
+    sync: false
+  - name: retention_rate
+    role: measure
+    description: 留存率=留存用户数除以注册用户数
+    alias: []
+    sync: false
+- name: ads_activity_conversion
+  role: fact
+  description: ADS-活动转化率
+  columns:
+  - name: dt
+    role: dimension
+    description: 日期
+    alias: []
+    sync: false
+  - name: activity_id
+    role: foreign_key
+    description: 活动ID
+    alias: []
     sync: false
   - name: activity_name
     role: dimension
-    description: Activity name.
-    alias: [活动名, activity_name]
-    sync: true
-  - name: activity_type
-    role: dimension
-    description: Activity type.
-    alias: [类型, activity_type]
-    sync: true
-- name: dwd_order_info_inc
-  role: fact
-  description: Order fact table; one row per order.
-  columns:
-  - name: id
-    role: primary_key
-    description: Order ID.
-    alias: [订单ID, order_id]
+    description: 活动名称
+    alias: []
     sync: false
-  - name: user_id
-    role: foreign_key
-    description: Foreign key linking to user dimension.
-    alias: [用户ID, user_id]
-    sync: false
-  - name: order_status
-    role: dimension
-    description: Order status (1001:Pending payment 1002:Paid 1003:Cancelled 1004:Completed 1005:Refunding 1006:Refunded).
-    alias: [状态, order_status]
-    sync: true
-  - name: total_amount
+  - name: order_count
     role: measure
-    description: Order total amount (includes unpaid; caliber: original_total_amount - coupon_reduce_amount - activity_reduce_amount + freight_fee).
-    alias: [金额, 总额, GMV, 销售额, total_amount]
+    description: 活动订单数
+    alias: []
+    sync: false
+  - name: order_amount
+    role: measure
+    description: 活动订单金额（活动带来的GMV）
+    alias: []
+    sync: false
+  - name: user_count
+    role: measure
+    description: 参与活动用户数（去重）
+    alias: []
+    sync: false
+- name: ads_coupon_roi
+  role: fact
+  description: ADS-优惠券 ROI
+  columns:
+  - name: dt
+    role: dimension
+    description: 日期
+    alias: []
+    sync: false
+  - name: coupon_id
+    role: foreign_key
+    description: 优惠券ID
+    alias: []
+    sync: false
+  - name: coupon_name
+    role: dimension
+    description: 优惠券名称
+    alias: []
+    sync: false
+  - name: get_count
+    role: measure
+    description: 优惠券领取数量
+    alias: []
+    sync: false
+  - name: used_count
+    role: measure
+    description: 优惠券使用数量
+    alias: []
+    sync: false
+  - name: coupon_amount
+    role: measure
+    description: 优惠券优惠总额=使用数乘面额
+    alias: []
+    sync: false
+  - name: order_amount
+    role: measure
+    description: 用券订单总金额
+    alias: []
+    sync: false
+  - name: roi
+    role: dimension
+    description: 优惠券ROI=用券订单金额除以优惠券优惠金额
+    alias: []
+    sync: false
+- name: ads_region_gmv_rank
+  role: fact
+  description: ADS-地区 GMV 排行
+  columns:
+  - name: dt
+    role: dimension
+    description: 日期
+    alias: []
     sync: false
   - name: province_id
     role: foreign_key
-    description: Foreign key linking to province dimension.
+    description: 省份ID
+    alias: []
+    sync: false
+  - name: province_name
+    role: dimension
+    description: 省份名
+    alias: []
+    sync: false
+  - name: region_name
+    role: dimension
+    description: 所属大区名（华东/华北等）
+    alias: []
+    sync: false
+  - name: gmv
+    role: measure
+    description: 该地区当日GMV
+    alias: []
+    sync: false
+  - name: gmv_rank
+    role: measure
+    description: GMV排名（1=最高）
+    alias: []
+    sync: false
+- name: ads_sku_topn
+  role: fact
+  description: ADS-商品 TopN
+  columns:
+  - name: dt
+    role: dimension
+    description: 日期
+    alias: []
+    sync: false
+  - name: topn_type
+    role: dimension
+    description: 排行类型（amount=按销售额 sale_count=按销量）
+    alias: []
+    sync: false
+  - name: rank_num
+    role: measure
+    description: 排名序号
+    alias: []
+    sync: false
+  - name: sku_id
+    role: foreign_key
+    description: 商品ID
+    alias: []
+    sync: false
+  - name: sku_name
+    role: dimension
+    description: 商品名称
+    alias: []
+    sync: false
+  - name: metric_value
+    role: dimension
+    description: 指标值（销售额或销量）
+    alias: []
+    sync: false
+- name: ads_user_conversion
+  role: fact
+  description: ADS-漏斗转化率
+  columns:
+  - name: dt
+    role: dimension
+    description: 日期
+    alias: []
+    sync: false
+  - name: display_count
+    role: measure
+    description: 曝光人数
+    alias: []
+    sync: false
+  - name: action_count
+    role: measure
+    description: 点击人数
+    alias: []
+    sync: false
+  - name: cart_count
+    role: measure
+    description: 加购人数
+    alias: []
+    sync: false
+  - name: order_count
+    role: measure
+    description: 下单人数
+    alias: []
+    sync: false
+  - name: payment_count
+    role: measure
+    description: 支付人数
+    alias: []
+    sync: false
+  - name: display_to_action_rate
+    role: measure
+    description: 曝光到点击转化率
+    alias: []
+    sync: false
+  - name: action_to_cart_rate
+    role: measure
+    description: 点击到加购转化率
+    alias: []
+    sync: false
+  - name: cart_to_order_rate
+    role: measure
+    description: 加购到下单转化率
+    alias: []
+    sync: false
+  - name: order_to_payment_rate
+    role: measure
+    description: 下单到支付转化率
+    alias: []
+    sync: false
+- name: dim_user_info
+  role: dim
+  description: DIM-用户维度（从 ods_db_full.ods_db_full[user_info] 同步）
+  columns:
+  - name: id
+    role: primary_key
+    description: 用户ID（主键）
+    alias: []
+    sync: false
+  - name: login_name
+    role: dimension
+    description: 登录名
+    alias: []
+    sync: false
+  - name: nick_name
+    role: dimension
+    description: 昵称
+    alias: []
+    sync: false
+  - name: name
+    role: dimension
+    description: 姓名
+    alias: []
+    sync: false
+  - name: phone_num
+    role: measure
+    description: 手机号（敏感字段，查询结果需脱敏）
+    alias: []
+    sync: false
+  - name: email
+    role: dimension
+    description: 邮箱（敏感字段）
+    alias: []
+    sync: false
+  - name: user_level
+    role: dimension
+    description: 会员等级：L1/L2/L3/L4
+    alias: []
+    sync: false
+  - name: birthday
+    role: dimension
+    description: 生日（问年龄段：90后=YEAR(birthday) BETWEEN 1990 AND 1999）
+    alias: []
+    sync: false
+  - name: gender
+    role: dimension
+    description: 性别：M=男 F=女
+    alias: []
+    sync: false
+  - name: create_time
+    role: dimension
+    description: 注册时间
+    alias: []
+    sync: false
+  - name: operate_time
+    role: measure
+    description: 修改时间
+    alias: []
+    sync: false
+- name: dim_sku_info
+  role: dim
+  description: DIM-SKU 商品维度（维度退化：品牌名 + 三级/二级/一级分类名）
+  columns:
+  - name: id
+    role: primary_key
+    description: SKU ID（主键，最小商品管理单位）
+    alias: []
+    sync: false
+  - name: spu_id
+    role: foreign_key
+    description: SPU ID（标准产品单位）
+    alias: []
+    sync: false
+  - name: sku_name
+    role: dimension
+    description: SKU名称
+    alias: []
+    sync: false
+  - name: sku_desc
+    role: dimension
+    description: 商品规格描述
+    alias: []
+    sync: false
+  - name: price
+    role: measure
+    description: 商品价格（单价）
+    alias: []
+    sync: false
+  - name: weight
+    role: measure
+    description: 重量
+    alias: []
+    sync: false
+  - name: tm_id
+    role: foreign_key
+    description: 品牌ID
+    alias: []
+    sync: false
+  - name: tm_name
+    role: dimension
+    description: 品牌名
+    alias: []
+    sync: false
+  - name: category3_id
+    role: foreign_key
+    description: 三级分类ID
+    alias: []
+    sync: false
+  - name: category3_name
+    role: dimension
+    description: 三级分类名
+    alias: []
+    sync: false
+  - name: category2_id
+    role: foreign_key
+    description: 二级分类ID
+    alias: []
+    sync: false
+  - name: category2_name
+    role: dimension
+    description: 二级分类名
+    alias: []
+    sync: false
+  - name: category1_id
+    role: foreign_key
+    description: 一级分类ID
+    alias: []
+    sync: false
+  - name: category1_name
+    role: dimension
+    description: 一级分类名
+    alias: []
+    sync: false
+  - name: sku_default_img
+    role: dimension
+    description: 默认图片
+    alias: []
+    sync: false
+  - name: is_sale
+    role: dimension
+    description: 是否在售：1=在售 0=下架
+    alias: []
+    sync: false
+  - name: create_time
+    role: dimension
+    description: 创建时间
+    alias: []
+    sync: false
+  - name: operate_time
+    role: measure
+    description: 修改时间
+    alias: []
+    sync: false
+- name: dim_spu_info
+  role: dim
+  description: DIM-SPU 维度
+  columns:
+  - name: id
+    role: primary_key
+    description: ''
+    alias: []
+    sync: false
+  - name: spu_name
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: description
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: category3_id
+    role: foreign_key
+    description: ''
+    alias: []
+    sync: false
+  - name: tm_id
+    role: foreign_key
+    description: ''
+    alias: []
+    sync: false
+  - name: create_time
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: operate_time
+    role: measure
+    description: ''
+    alias: []
+    sync: false
+- name: dim_base_category1
+  role: dim
+  description: ''
+  columns:
+  - name: id
+    role: primary_key
+    description: ''
+    alias: []
+    sync: false
+  - name: name
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: create_time
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: operate_time
+    role: measure
+    description: ''
+    alias: []
+    sync: false
+- name: dim_base_category2
+  role: dim
+  description: ''
+  columns:
+  - name: id
+    role: primary_key
+    description: ''
+    alias: []
+    sync: false
+  - name: name
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: category1_id
+    role: foreign_key
+    description: ''
+    alias: []
+    sync: false
+  - name: create_time
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: operate_time
+    role: measure
+    description: ''
+    alias: []
+    sync: false
+- name: dim_base_category3
+  role: dim
+  description: ''
+  columns:
+  - name: id
+    role: primary_key
+    description: ''
+    alias: []
+    sync: false
+  - name: name
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: category2_id
+    role: foreign_key
+    description: ''
+    alias: []
+    sync: false
+  - name: create_time
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: operate_time
+    role: measure
+    description: ''
+    alias: []
+    sync: false
+- name: dim_base_province
+  role: dim
+  description: DIM-省份维度（退化 region_name）
+  columns:
+  - name: id
+    role: primary_key
+    description: 省份ID（主键）
+    alias: []
+    sync: false
+  - name: name
+    role: dimension
+    description: 省份名
+    alias: []
+    sync: false
+  - name: region_id
+    role: foreign_key
+    description: 大区ID
+    alias: []
+    sync: false
+  - name: region_name
+    role: dimension
+    description: 大区名（华东/华北/华南/西南/东北/西北）
+    alias: []
+    sync: false
+  - name: area_code
+    role: dimension
+    description: 地区编码
+    alias: []
+    sync: false
+  - name: iso_code
+    role: dimension
+    description: 旧版ISO编码
+    alias: []
+    sync: false
+  - name: iso_3166_2
+    role: dimension
+    description: 新版ISO编码
+    alias: []
+    sync: false
+  - name: create_time
+    role: dimension
+    description: 创建时间
+    alias: []
+    sync: false
+  - name: operate_time
+    role: measure
+    description: 修改时间
+    alias: []
+    sync: false
+- name: dim_base_region
+  role: dim
+  description: DIM-大区维度
+  columns:
+  - name: id
+    role: primary_key
+    description: 大区ID（varchar）
+    alias: []
+    sync: false
+  - name: region_name
+    role: dimension
+    description: 大区名（华东/华北/华南/西南/东北/西北）
+    alias: []
+    sync: false
+  - name: create_time
+    role: dimension
+    description: 创建时间
+    alias: []
+    sync: false
+  - name: operate_time
+    role: measure
+    description: 修改时间
+    alias: []
+    sync: false
+- name: dim_date
+  role: dim
+  description: DIM-时间维度
+  columns:
+  - name: dt
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: week
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: month
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: quarter
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: year
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: holiday
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: is_weekend
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+- name: dim_activity_info
+  role: dim
+  description: DIM-活动维度
+  columns:
+  - name: id
+    role: primary_key
+    description: 活动ID
+    alias: []
+    sync: false
+  - name: activity_name
+    role: dimension
+    description: 活动名称
+    alias: []
+    sync: false
+  - name: activity_type
+    role: dimension
+    description: 活动类型
+    alias: []
+    sync: false
+  - name: activity_desc
+    role: dimension
+    description: 活动描述
+    alias: []
+    sync: false
+  - name: start_time
+    role: dimension
+    description: 开始时间
+    alias: []
+    sync: false
+  - name: end_time
+    role: dimension
+    description: 结束时间
+    alias: []
+    sync: false
+  - name: create_time
+    role: dimension
+    description: 创建时间
+    alias: []
+    sync: false
+  - name: operate_time
+    role: measure
+    description: 修改时间
+    alias: []
+    sync: false
+- name: dim_coupon_info
+  role: dim
+  description: DIM-优惠券维度
+  columns:
+  - name: id
+    role: primary_key
+    description: 优惠券ID
+    alias: []
+    sync: false
+  - name: coupon_name
+    role: dimension
+    description: 优惠券名称
+    alias: []
+    sync: false
+  - name: coupon_type
+    role: dimension
+    description: 优惠券类型
+    alias: []
+    sync: false
+  - name: condition_amount
+    role: measure
+    description: ''
+    alias: []
+    sync: false
+  - name: condition_num
+    role: measure
+    description: ''
+    alias: []
+    sync: false
+  - name: activity_id
+    role: foreign_key
+    description: ''
+    alias: []
+    sync: false
+  - name: benefit_amount
+    role: measure
+    description: 面额/优惠金额
+    alias: []
+    sync: false
+  - name: benefit_discount
+    role: measure
+    description: ''
+    alias: []
+    sync: false
+  - name: range_type
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: limit_num
+    role: measure
+    description: ''
+    alias: []
+    sync: false
+  - name: taken_count
+    role: measure
+    description: ''
+    alias: []
+    sync: false
+  - name: start_time
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: end_time
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: expire_time
+    role: dimension
+    description: 过期时间
+    alias: []
+    sync: false
+  - name: range_desc
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: create_time
+    role: dimension
+    description: 创建时间
+    alias: []
+    sync: false
+  - name: operate_time
+    role: measure
+    description: 修改时间
+    alias: []
+    sync: false
+- name: dim_base_dic
+  role: dim
+  description: DIM-字典维度
+  columns:
+  - name: dic_code
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: dic_name
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: parent_code
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: create_time
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: operate_time
+    role: measure
+    description: ''
+    alias: []
+    sync: false
+- name: dim_base_trademark
+  role: dim
+  description: DIM-品牌维度
+  columns:
+  - name: id
+    role: primary_key
+    description: ''
+    alias: []
+    sync: false
+  - name: tm_name
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: logo_url
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: create_time
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: operate_time
+    role: measure
+    description: ''
+    alias: []
+    sync: false
+- name: dwd_order_info_inc
+  role: fact
+  description: DWD-订单事实（增量）
+  columns:
+  - name: id
+    role: primary_key
+    description: 订单ID（主键），一条记录=一个订单
+    alias: []
+    sync: false
+  - name: user_id
+    role: foreign_key
+    description: 下单用户ID（关联dim_user_info.id）
+    alias: []
+    sync: false
+  - name: order_status
+    role: dimension
+    description: 订单状态码：1001=已支付/有效订单（当前数据仅此状态）。1002=未支付 1003=已取消 1004=已退款
+    alias: []
+    sync: false
+  - name: total_amount
+    role: measure
+    description: 订单总金额=商品金额减优惠（含活动/优惠券优惠），不含运费。统计GMV/金额用此字段
     alias: []
     sync: false
   - name: original_total_amount
     role: measure
-    description: Original amount.
-    alias: [原价, original_amount]
+    description: 原始总金额（优惠前）
+    alias: []
     sync: false
   - name: activity_reduce_amount
     role: measure
-    description: Activity discount.
-    alias: [活动优惠, activity_discount]
+    description: 活动优惠金额
+    alias: []
     sync: false
   - name: coupon_reduce_amount
     role: measure
-    description: Coupon discount.
-    alias: [券优惠, coupon_discount]
+    description: 优惠券优惠金额
+    alias: []
+    sync: false
+  - name: feight_fee
+    role: dimension
+    description: 运费
+    alias: []
+    sync: false
+  - name: feight_fee_reduce
+    role: dimension
+    description: 运费优惠
+    alias: []
+    sync: false
+  - name: payment_way
+    role: dimension
+    description: 支付方式
+    alias: []
+    sync: false
+  - name: out_trade_no
+    role: dimension
+    description: 对外交易号
+    alias: []
+    sync: false
+  - name: trade_body
+    role: dimension
+    description: 交易描述
+    alias: []
+    sync: false
+  - name: province_id
+    role: foreign_key
+    description: 省份ID（关联dim_base_province.id）
+    alias: []
+    sync: false
+  - name: parent_order_id
+    role: foreign_key
+    description: 父订单ID
+    alias: []
+    sync: false
+  - name: process_status
+    role: dimension
+    description: 进度状态
+    alias: []
+    sync: false
+  - name: tracking_no
+    role: dimension
+    description: 物流单号
+    alias: []
+    sync: false
+  - name: create_time
+    role: dimension
+    description: 下单时间
+    alias: []
+    sync: false
+  - name: operate_time
+    role: measure
+    description: 修改时间
+    alias: []
+    sync: false
+  - name: ts
+    role: dimension
+    description: binlog时间戳
+    alias: []
     sync: false
   - name: dt
     role: dimension
-    description: Business date.
-    alias: [日期, date]
+    description: 分区日期（下单日）
+    alias: []
     sync: false
 - name: dwd_order_detail_inc
   role: fact
-  description: Order detail fact table; one row per order SKU.
+  description: DWD-订单明细事实（增量）
   columns:
   - name: id
     role: primary_key
-    description: Detail ID.
+    description: 订单明细ID（一个订单可含多个SKU）
     alias: []
     sync: false
   - name: order_id
     role: foreign_key
-    description: Foreign key linking to order.
-    alias: [订单ID, order_id]
+    description: 订单ID（关联dwd_order_info_inc.id）
+    alias: []
     sync: false
   - name: sku_id
     role: foreign_key
-    description: Foreign key linking to product.
-    alias: [商品ID, sku_id]
+    description: 商品SKU ID（关联dim_sku_info.id）
+    alias: []
     sync: false
   - name: sku_name
     role: dimension
-    description: Product name.
-    alias: [商品名, sku_name]
-    sync: true
+    description: SKU名称
+    alias: []
+    sync: false
+  - name: img_url
+    role: dimension
+    description: 商品图片
+    alias: []
+    sync: false
   - name: order_price
     role: measure
-    description: Order unit price.
-    alias: [价格, price]
+    description: 下单单价
+    alias: []
     sync: false
   - name: sku_num
     role: measure
-    description: Purchase quantity.
-    alias: [数量, 件数, quantity]
+    description: 购买数量
+    alias: []
     sync: false
   - name: split_total_amount
     role: measure
-    description: Order detail split amount (includes discount allocation; caliber: SKU amount / order total * paid total).
-    alias: [分摊, split_amount]
+    description: 分摊后总金额（订单金额分摊到此明细）
+    alias: []
+    sync: false
+  - name: split_activity_amount
+    role: measure
+    description: 活动优惠分摊金额
+    alias: []
+    sync: false
+  - name: split_coupon_amount
+    role: measure
+    description: 优惠券优惠分摊金额
+    alias: []
+    sync: false
+  - name: create_time
+    role: dimension
+    description: 创建时间
+    alias: []
+    sync: false
+  - name: operate_time
+    role: measure
+    description: 修改时间
+    alias: []
+    sync: false
+  - name: ts
+    role: dimension
+    description: binlog时间戳
+    alias: []
+    sync: false
+  - name: dt
+    role: dimension
+    description: 分区日期
+    alias: []
     sync: false
 - name: dwd_payment_info_inc
   role: fact
-  description: Payment fact table; one row per payment.
+  description: DWD-支付事实（增量）
   columns:
   - name: id
     role: primary_key
-    description: Payment ID.
+    description: 支付ID
+    alias: []
+    sync: false
+  - name: out_trade_no
+    role: dimension
+    description: 对外交易号
     alias: []
     sync: false
   - name: order_id
     role: foreign_key
-    description: Foreign key linking to order.
-    alias: [订单ID, order_id]
+    description: 订单ID（关联dwd_order_info_inc.id）
+    alias: []
     sync: false
   - name: user_id
     role: foreign_key
-    description: Foreign key linking to user.
-    alias: [用户ID, user_id]
+    description: 支付用户ID
+    alias: []
     sync: false
   - name: payment_type
     role: dimension
-    description: Payment method.
-    alias: [支付方式, payment_method]
-    sync: true
+    description: 支付类型（微信/支付宝，匹配时用LIKE '%wechat%'/'%alipay%'）
+    alias: []
+    sync: false
+  - name: trade_no
+    role: dimension
+    description: 交易编号
+    alias: []
+    sync: false
   - name: total_amount
     role: measure
-    description: Payment amount.
-    alias: [支付额, payment_amount]
+    description: 支付金额
+    alias: []
     sync: false
   - name: payment_status
     role: dimension
-    description: Payment status.
-    alias: [状态, payment_status]
-    sync: true
-- name: dwd_cart_info_inc
-  role: fact
-  description: Add-to-cart fact table; one row per add-to-cart event.
-  columns:
-  - name: id
-    role: primary_key
-    description: Cart ID.
+    description: 支付状态（PAID=已支付）
     alias: []
     sync: false
-  - name: user_id
-    role: foreign_key
-    description: Foreign key linking to user.
-    alias: [用户ID, user_id]
+  - name: create_time
+    role: dimension
+    description: 创建时间
+    alias: []
     sync: false
-  - name: sku_id
-    role: foreign_key
-    description: Foreign key linking to product.
-    alias: [商品ID, sku_id]
+  - name: callback_time
+    role: dimension
+    description: 回调时间
+    alias: []
     sync: false
-  - name: cart_price
+  - name: operate_time
     role: measure
-    description: Add-to-cart price.
-    alias: [价格, cart_price]
+    description: 修改时间
+    alias: []
     sync: false
-  - name: sku_num
-    role: measure
-    description: Add-to-cart quantity.
-    alias: [数量, quantity]
+  - name: ts
+    role: dimension
+    description: binlog时间戳
+    alias: []
+    sync: false
+  - name: dt
+    role: dimension
+    description: 分区日期
+    alias: []
     sync: false
 - name: dwd_comment_info_inc
   role: fact
-  description: Review fact table; one row per review.
+  description: DWD-评论事实（增量）
   columns:
   - name: id
     role: primary_key
-    description: Review ID.
+    description: 评论ID
     alias: []
     sync: false
   - name: user_id
     role: foreign_key
-    description: Foreign key linking to user.
-    alias: [用户ID, user_id]
+    description: 评论用户ID
+    alias: []
+    sync: false
+  - name: nick_name
+    role: dimension
+    description: 用户昵称
+    alias: []
+    sync: false
+  - name: head_img
+    role: dimension
+    description: 头像
+    alias: []
     sync: false
   - name: sku_id
     role: foreign_key
-    description: Foreign key linking to product.
-    alias: [商品ID, sku_id]
+    description: 商品SKU ID
+    alias: []
+    sync: false
+  - name: spu_id
+    role: foreign_key
+    description: SPU ID
+    alias: []
+    sync: false
+  - name: order_id
+    role: foreign_key
+    description: 订单ID
+    alias: []
     sync: false
   - name: appraise
     role: dimension
-    description: Rating level.
-    alias: [评价, 评分, rating]
-    sync: true
-- name: dws_user_user_order_day
-  role: fact
-  description: User-order daily summary table; one row per user per day.
-  columns:
-  - name: user_id
-    role: primary_key
-    description: User ID.
+    description: 评价等级：1=好评 2=中评 3=差评
+    alias: []
+    sync: false
+  - name: comment_txt
+    role: dimension
+    description: 评论内容
+    alias: []
+    sync: false
+  - name: create_time
+    role: dimension
+    description: 评论时间
+    alias: []
+    sync: false
+  - name: operate_time
+    role: measure
+    description: 修改时间
+    alias: []
+    sync: false
+  - name: ts
+    role: dimension
+    description: binlog时间戳
     alias: []
     sync: false
   - name: dt
     role: dimension
-    description: Date.
-    alias: [日期, date]
+    description: 分区日期
+    alias: []
+    sync: false
+- name: dwd_cart_info_inc
+  role: fact
+  description: DWD-购物车事实（增量）
+  columns:
+  - name: id
+    role: primary_key
+    description: ''
+    alias: []
+    sync: false
+  - name: user_id
+    role: foreign_key
+    description: ''
+    alias: []
+    sync: false
+  - name: sku_id
+    role: foreign_key
+    description: ''
+    alias: []
+    sync: false
+  - name: cart_price
+    role: measure
+    description: ''
+    alias: []
+    sync: false
+  - name: sku_num
+    role: measure
+    description: ''
+    alias: []
+    sync: false
+  - name: img_url
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: sku_name
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: is_checked
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: is_ordered
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: order_time
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: create_time
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: operate_time
+    role: measure
+    description: ''
+    alias: []
+    sync: false
+  - name: ts
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: dt
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+- name: dwd_coupon_use_inc
+  role: fact
+  description: DWD-优惠券领用事实（增量）
+  columns:
+  - name: id
+    role: primary_key
+    description: ''
+    alias: []
+    sync: false
+  - name: coupon_id
+    role: foreign_key
+    description: ''
+    alias: []
+    sync: false
+  - name: user_id
+    role: foreign_key
+    description: ''
+    alias: []
+    sync: false
+  - name: order_id
+    role: foreign_key
+    description: ''
+    alias: []
+    sync: false
+  - name: coupon_status
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: get_time
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: using_time
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: used_time
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: expire_time
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: create_time
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: operate_time
+    role: measure
+    description: ''
+    alias: []
+    sync: false
+  - name: ts
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: dt
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+- name: dwd_favor_info_inc
+  role: fact
+  description: DWD-收藏事实（增量）
+  columns:
+  - name: id
+    role: primary_key
+    description: ''
+    alias: []
+    sync: false
+  - name: user_id
+    role: foreign_key
+    description: ''
+    alias: []
+    sync: false
+  - name: sku_id
+    role: foreign_key
+    description: ''
+    alias: []
+    sync: false
+  - name: spu_id
+    role: foreign_key
+    description: ''
+    alias: []
+    sync: false
+  - name: is_cancel
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: create_time
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: operate_time
+    role: measure
+    description: ''
+    alias: []
+    sync: false
+  - name: ts
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: dt
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+- name: dwd_order_refund_info_inc
+  role: fact
+  description: DWD-退款事实（增量）
+  columns:
+  - name: id
+    role: primary_key
+    description: 退款单ID
+    alias: []
+    sync: false
+  - name: user_id
+    role: foreign_key
+    description: 申请用户ID
+    alias: []
+    sync: false
+  - name: order_id
+    role: foreign_key
+    description: 订单ID
+    alias: []
+    sync: false
+  - name: sku_id
+    role: foreign_key
+    description: 商品SKU ID
+    alias: []
+    sync: false
+  - name: refund_type
+    role: dimension
+    description: 退款类型
+    alias: []
+    sync: false
+  - name: refund_num
+    role: measure
+    description: 退货件数
+    alias: []
+    sync: false
+  - name: refund_amount
+    role: measure
+    description: 退款金额
+    alias: []
+    sync: false
+  - name: refund_reason_type
+    role: dimension
+    description: 退款原因类型
+    alias: []
+    sync: false
+  - name: refund_reason_txt
+    role: dimension
+    description: 退款原因内容
+    alias: []
+    sync: false
+  - name: refund_status
+    role: dimension
+    description: 退款状态：0=待审批 1=已退款
+    alias: []
+    sync: false
+  - name: create_time
+    role: dimension
+    description: 创建时间
+    alias: []
+    sync: false
+  - name: operate_time
+    role: measure
+    description: 修改时间
+    alias: []
+    sync: false
+  - name: ts
+    role: dimension
+    description: binlog时间戳
+    alias: []
+    sync: false
+  - name: dt
+    role: dimension
+    description: 分区日期
+    alias: []
+    sync: false
+- name: dws_sales_wide
+  role: fact
+  description: ''
+  columns:
+  - name: brand
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: region_name
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: province_name
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: sku_name
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: total_amount
+    role: measure
+    description: ''
+    alias: []
+    sync: false
+  - name: total_quantity
+    role: measure
+    description: ''
+    alias: []
     sync: false
   - name: order_count
     role: measure
-    description: Number of orders placed.
-    alias: [订单数, order_count]
+    description: ''
+    alias: []
+    sync: false
+  - name: dt
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+- name: dws_user_user_order_day
+  role: fact
+  description: DWS-用户每日下单汇总
+  columns:
+  - name: user_id
+    role: foreign_key
+    description: 用户ID
+    alias: []
+    sync: false
+  - name: dt
+    role: dimension
+    description: 日期
+    alias: []
+    sync: false
+  - name: order_count
+    role: measure
+    description: 当日下单数
+    alias: []
     sync: false
   - name: order_amount
     role: measure
-    description: Order amount.
-    alias: [下单额, order_amount]
+    description: 当日下单金额
+    alias: []
     sync: false
   - name: order_sku_count
     role: measure
-    description: Number of SKUs ordered.
-    alias: [SKU数, sku_count]
+    description: ''
+    alias: []
     sync: false
 - name: dws_sku_sku_order_day
   role: fact
-  description: Product-order daily summary table; one row per product per day.
+  description: DWS-SKU 每日下单汇总
   columns:
   - name: sku_id
-    role: primary_key
-    description: Product ID.
+    role: foreign_key
+    description: 商品SKU ID
     alias: []
     sync: false
   - name: dt
     role: dimension
-    description: Date.
-    alias: [日期, date]
+    description: 日期
+    alias: []
     sync: false
   - name: order_count
     role: measure
-    description: Number of times ordered.
-    alias: [订单数, order_count]
+    description: 当日下单数
+    alias: []
     sync: false
   - name: order_sku_num
     role: measure
-    description: Units ordered.
-    alias: [销量, sales_quantity]
+    description: 当日销量（件数）
+    alias: []
     sync: false
   - name: order_amount
     role: measure
-    description: Sales amount.
-    alias: [销售额, GMV, sales_amount]
+    description: 当日销售额（下单金额）
+    alias: []
     sync: false
 - name: dws_region_region_order_day
   role: fact
-  description: Region-order daily summary table; one row per province per day.
+  description: DWS-地区每日订单汇总
   columns:
   - name: province_id
-    role: primary_key
-    description: Province ID.
+    role: foreign_key
+    description: 省份ID
     alias: []
     sync: false
   - name: dt
     role: dimension
-    description: Date.
-    alias: [日期, date]
+    description: 日期
+    alias: []
     sync: false
   - name: order_count
     role: measure
-    description: Order count.
-    alias: [订单数, order_count]
+    description: ''
+    alias: []
     sync: false
   - name: order_amount
     role: measure
-    description: Order amount.
-    alias: [金额, GMV, amount]
+    description: ''
+    alias: []
     sync: false
-- name: dws_sales_wide
-  role: measure
-  description: Sales wide table: brand + region + sales amount (pre-aggregated across dimensions to support brand x region cross queries).
+  - name: order_user_count
+    role: measure
+    description: ''
+    alias: []
+    sync: false
+  - name: payment_count
+    role: measure
+    description: 当日支付单数
+    alias: []
+    sync: false
+  - name: payment_amount
+    role: measure
+    description: 当日支付金额
+    alias: []
+    sync: false
+- name: dws_activity_activity_order_day
+  role: fact
+  description: DWS-活动每日订单汇总
   columns:
-  - name: brand
-    type: VARCHAR(200)
-    role: dimension
-    description: Brand name.
-    alias: [品牌, 商标, brand]
-  - name: region_name
-    type: VARCHAR(20)
-    role: dimension
-    description: Region name (East/South/North China, etc.).
-    alias: [地区, 区域, 大区, region]
-  - name: province_name
-    type: VARCHAR(20)
-    role: dimension
-    description: Province name.
-    alias: [省份, 省, province]
-  - name: sku_name
-    type: VARCHAR(500)
-    role: dimension
-    description: Product name.
-    alias: [商品, 产品, SKU, sku_name]
-  - name: total_amount
-    type: DECIMAL(18,2)
-    role: measure
-    description: Brand x region total sales amount (caliber: tax-inclusive GMV of signed-for orders, refunds excluded).
-    alias: [销售额, GMV, 营收, 收入, total_amount]
-  - name: total_quantity
-    type: BIGINT
-    role: measure
-    description: Sales quantity.
-    alias: [销量, 件数, total_quantity]
-  - name: order_count
-    type: BIGINT
-    role: measure
-    description: Order count.
-    alias: [订单量, order_count]
+  - name: activity_id
+    role: foreign_key
+    description: 活动ID
+    alias: []
+    sync: false
   - name: dt
-    type: DATE
     role: dimension
-    description: Date.
-    alias: [日期, 时间, 天, date]
-- name: dim_base_region
-  role: dimension
-  description: Macro-region dimension table (10 regions: East/South/North/Central/Southwest/Northwest/Northeast China, etc.).
-  columns:
-  - name: id
-    type: VARCHAR
-    role: primary_key
-    description: Macro-region ID.
+    description: 日期
     alias: []
-  - name: region_name
-    type: VARCHAR
-    role: dimension
-    description: Macro-region name.
-    alias: [大区, 地区, 区域, region]
-- name: dim_base_category1
-  role: dimension
-  description: Level-1 category dimension table (17 categories such as home appliances/food/apparel).
-  columns:
-  - name: id
-    type: VARCHAR
-    role: primary_key
-    description: Level-1 category ID.
+    sync: false
+  - name: order_count
+    role: measure
+    description: 活动订单数
     alias: []
-  - name: name
-    type: VARCHAR
-    role: dimension
-    description: Level-1 category name.
-    alias: [品类, 类目, 一级品类, category1]
-- name: dim_spu_info
-  role: dimension
-  description: SPU information dimension table (Standard Product Unit).
+    sync: false
+  - name: order_amount
+    role: measure
+    description: 活动订单金额
+    alias: []
+    sync: false
+  - name: activity_user_count
+    role: measure
+    description: 参与活动用户数（去重）
+    alias: []
+    sync: false
+- name: dws_coupon_coupon_use_day
+  role: fact
+  description: DWS-优惠券每日领用汇总
   columns:
-  - name: id
-    type: VARCHAR
-    role: primary_key
-    description: SPU ID.
-    alias: [SPUID, spu_id]
-  - name: spu_name
-    type: VARCHAR
-    role: dimension
-    description: SPU name.
-    alias: [SPU名称, 标准品名, spu_name]
-  - name: category3_id
-    type: VARCHAR
+  - name: coupon_id
     role: foreign_key
-    description: Foreign key linking to level-3 category.
+    description: 优惠券ID
     alias: []
-  - name: tm_id
-    type: VARCHAR
+    sync: false
+  - name: dt
+    role: dimension
+    description: 日期
+    alias: []
+    sync: false
+  - name: get_count
+    role: measure
+    description: 领取数
+    alias: []
+    sync: false
+  - name: using_count
+    role: measure
+    description: ''
+    alias: []
+    sync: false
+  - name: used_count
+    role: measure
+    description: 使用数
+    alias: []
+    sync: false
+- name: dws_user_user_cart_day
+  role: fact
+  description: DWS-用户每日加购汇总
+  columns:
+  - name: user_id
     role: foreign_key
-    description: Foreign key linking to brand.
+    description: ''
     alias: []
-metrics:
-- name: GMV
-  description: Gross Merchandise Value; the sum of transaction amounts across all orders.
-  relevant_columns:
-  - dwd_order_info_inc.total_amount
-  alias: [成交总额, 订单总额, 销售总额, 交易额, gross_merchandise_value]
-- name: AOV
-  description: Average Order Value (per-customer transaction value).
-  relevant_columns:
-  - dws_user_user_order_day.order_amount
-  alias: [客单价, 平均订单金额, average_order_value]
-- name: repurchase_rate
-  description: User repurchase rate.
-  relevant_columns:
-  - dws_user_user_order_day.order_count
-  alias: [复购, 回头率, repurchase_rate]
-- name: conversion_rate
-  description: Funnel conversion rate.
-  relevant_columns:
-  - dwd_order_info_inc.total_amount
-  alias: [转化, 转化率, 漏斗, conversion_rate]
+    sync: false
+  - name: dt
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: cart_count
+    role: measure
+    description: ''
+    alias: []
+    sync: false
+  - name: cart_amount
+    role: measure
+    description: ''
+    alias: []
+    sync: false
+- name: dws_sku_sku_favor_day
+  role: fact
+  description: DWS-SKU 每日收藏汇总
+  columns:
+  - name: sku_id
+    role: foreign_key
+    description: 商品SKU ID
+    alias: []
+    sync: false
+  - name: dt
+    role: dimension
+    description: 日期
+    alias: []
+    sync: false
+  - name: favor_count
+    role: measure
+    description: 当日收藏数
+    alias: []
+    sync: false
+- name: dws_sku_sku_comment_day
+  role: fact
+  description: DWS-SKU 每日评论汇总
+  columns:
+  - name: sku_id
+    role: foreign_key
+    description: 商品SKU ID
+    alias: []
+    sync: false
+  - name: dt
+    role: dimension
+    description: 日期
+    alias: []
+    sync: false
+  - name: comment_count
+    role: measure
+    description: 当日评论数
+    alias: []
+    sync: false
+  - name: good_comment_count
+    role: measure
+    description: ''
+    alias: []
+    sync: false
+- name: dws_user_user_payment_day
+  role: fact
+  description: DWS-用户每日支付汇总
+  columns:
+  - name: user_id
+    role: foreign_key
+    description: 用户ID
+    alias: []
+    sync: false
+  - name: dt
+    role: dimension
+    description: 日期
+    alias: []
+    sync: false
+  - name: payment_count
+    role: measure
+    description: 当日支付单数
+    alias: []
+    sync: false
+  - name: payment_amount
+    role: measure
+    description: 当日支付金额
+    alias: []
+    sync: false
+- name: dws_sku_sku_payment_day
+  role: fact
+  description: DWS-SKU 每日支付汇总
+  columns:
+  - name: sku_id
+    role: foreign_key
+    description: ''
+    alias: []
+    sync: false
+  - name: dt
+    role: dimension
+    description: ''
+    alias: []
+    sync: false
+  - name: payment_count
+    role: measure
+    description: ''
+    alias: []
+    sync: false
+  - name: payment_sku_num
+    role: measure
+    description: ''
+    alias: []
+    sync: false
+  - name: payment_amount
+    role: measure
+    description: ''
+    alias: []
+    sync: false
+metrics: []

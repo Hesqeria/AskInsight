@@ -1,0 +1,82 @@
+{
+  "run_id": "20260812_154650_de673d",
+  "adapter": "mock",
+  "data_root": "D:/datasets/livesqlbench-base-lite-sqlite",
+  "time": "2026-08-12T15:46:50.519124",
+  "total": 10,
+  "passed": 6,
+  "success_rate": 0.6,
+  "by_category": {
+    "Management": {
+      "total": 10,
+      "passed": 6,
+      "rate": 0.6
+    }
+  },
+  "by_difficulty": {
+    "Simple": {
+      "total": 7,
+      "passed": 4,
+      "rate": 0.5714
+    },
+    "Moderate": {
+      "total": 3,
+      "passed": 2,
+      "rate": 0.6667
+    }
+  },
+  "failures": [
+    {
+      "instance_id": "archeology_M_1",
+      "question": "We need to create a persistent table of all High Fidelity Mesh data for our archaeological analysis. Please set up a materialized view called 'high_fidelity_meshes'. The view should include the mesh's registry ID, site reference, equipment used, vertex and face counts, resolution in millimeters, geometric accuracy, and the calculated MCR value. Only include meshes that meet all the High Fidelity Mesh criteria.",
+      "category": "Management",
+      "difficulty": "Moderate",
+      "ex_correct": false,
+      "pred_rows": 0,
+      "sol_rows": 0,
+      "error": "断言失败",
+      "match_reason": "",
+      "pred_sql": "CREATE VIEW high_fidelity_meshes AS SELECT sm.facetregistry, sm.zoneref, sm.equipref, sm.facetverts, sm.facetfaces, sm.facetresmm, sm.geomdeltamm, ( CAST(sm.facetfaces AS REAL) / NULLIF(sm.facetverts, 0) / POWER(sm.facetresmm, 2) ) * 1000 AS mcr FROM scanmesh AS sm WHERE ( CAST(sm.facetfaces AS REAL) / NULLIF(sm.facetverts, 0) / POWER(sm.facetresmm, 2) ) * 1000 > 5.0 AND sm.facetresmm < 1.0 AND sm.geomdeltamm < 0.5",
+      "sol_sql": "CREATE VIEW high_fidelity_meshes AS SELECT sm.facetregistry, sm.zoneref, sm.equipref, sm.facetverts, sm.facetfaces, sm.facetresmm, sm.geomdeltamm, ( CAST(sm.facetfaces AS REAL) / NULLIF(sm.facetverts, 0) / POWER(sm.facetresmm, 2) ) * 1000 AS mcr FROM scanmesh AS sm WHERE ( CAST(sm.facetfaces AS REAL) / NULLIF(sm.facetverts, 0) / POWER(sm.facetresmm, 2) ) * 1000 > 5.0 AND sm.facetresmm < 1.0 AND sm.geomdeltamm < 0.5"
+    },
+    {
+      "instance_id": "archeology_M_2",
+      "question": "I want to calculate the Scan Resolution Index (SRI) for an archaeological scan with a resolution of 2.4 millimeters and point density of 42812. Please compute the SRI using the standard formula, including proper error handling for negative values and division by zero scenarios, and return null if any invalid conditions are detected. The calculation should convert the resolution to micrometers (multiply by 1000) and use base-10 logarithms in the formula.",
+      "category": "Management",
+      "difficulty": "Simple",
+      "ex_correct": false,
+      "pred_rows": 0,
+      "sol_rows": 0,
+      "error": "test_case 异常: float() argument must be a string or a real number, not 'tuple'",
+      "match_reason": "Traceback (most recent call last):\n  File \"D:\\大模型\\智能问数\\AskInsight\\backend\\app\\eval\\evaluator\\management_ex.py\", line 193, in evaluate_management\n    result = test_fn(pred_sqls, sol_sqls, \"\", conn)\n  File \"<string>\", line 5, in test_case\nTypeError: float() argument must be a string or a real number, not 'tuple'\n",
+      "pred_sql": "SELECT CASE WHEN 2.4 <= 0 OR 42812 <= 0 THEN NULL WHEN LOG10(42812) = 0 THEN NULL ELSE (LOG10(2.4 * 1000.0) / LOG10(42812)) * 5.0 END AS sri;",
+      "sol_sql": "SELECT CASE WHEN 2.4 <= 0 OR 42812 <= 0 THEN NULL WHEN LOG10(42812) = 0 THEN NULL ELSE (LOG10(2.4 * 1000.0) / LOG10(42812)) * 5.0 END AS sri;"
+    },
+    {
+      "instance_id": "archeology_M_3",
+      "question": "Create a view called view_premium_quality_scans that identifies high-quality archaeological scans. This view should include the Scan ID, Project Reference, Site Reference, Scan Timestamp, Scan Resolution (mm), Point Density (points/m²), Coverage (%), Overlap (%), and Noise Level (dB). Please include all scans, even those that may not yet have associated point cloud data. The view should identify scans that meet the criteria for both a High Resolution Scan and Comprehensive Coverage, and also have a Noise Level less than 1.5.",
+      "category": "Management",
+      "difficulty": "Simple",
+      "ex_correct": false,
+      "pred_rows": 0,
+      "sol_rows": 0,
+      "error": "断言失败",
+      "match_reason": "",
+      "pred_sql": "CREATE VIEW view_premium_quality_scans AS SELECT s.QuestRegistry, s.ArcRef, s.ZoneRef, s.ChronoTag, spc.ScanResolMm, spc.PointDense, spc.CoverPct, spc.LapPct, spc.NoiseDb FROM scans s LEFT JOIN scanpointcloud spc ON s.ArcRef = spc.ArcRef AND s.CrewRef = spc.CrewRef WHERE spc.ScanResolMm <= 1.0 AND spc.PointDense >= 1000 AND spc.CoverPct >= 95.0 AND spc.LapPct >= 30.0 AND spc.NoiseDb < 1.5;",
+      "sol_sql": "CREATE VIEW view_premium_quality_scans AS SELECT s.QuestRegistry, s.ArcRef, s.ZoneRef, s.ChronoTag, spc.ScanResolMm, spc.PointDense, spc.CoverPct, spc.LapPct, spc.NoiseDb FROM scans s LEFT JOIN scanpointcloud spc ON s.ArcRef = spc.ArcRef AND s.CrewRef = spc.CrewRef WHERE spc.ScanResolMm <= 1.0 AND spc.PointDense >= 1000 AND spc.CoverPct >= 95.0 AND spc.LapPct >= 30.0 AND spc.NoiseDb < 1.5;"
+    },
+    {
+      "instance_id": "archeology_M_4",
+      "question": "A view named site_esi is required. This view should determine the Environmental Suitability Index for each site. The output should include the Zone Reference and the calculated ESI value, rounded to two decimal places.",
+      "category": "Management",
+      "difficulty": "Simple",
+      "ex_correct": false,
+      "pred_rows": 0,
+      "sol_rows": 0,
+      "error": "断言失败",
+      "match_reason": "",
+      "pred_sql": "CREATE VIEW site_esi AS SELECT zoneref, ROUND( 100 - 2.5 * ABS(ambictemp - 20) - POWER(ABS(humepct - 50) / 2, 1.5) - 600 / ( illumelux + 100 ), 2 ) AS esi FROM scanenvironment",
+      "sol_sql": "CREATE VIEW site_esi AS SELECT zoneref, ROUND( 100 - 2.5 * ABS(ambictemp - 20) - POWER(ABS(humepct - 50) / 2, 1.5) - 600 / ( illumelux + 100 ), 2 ) AS esi FROM scanenvironment"
+    }
+  ]
+}

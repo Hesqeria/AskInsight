@@ -5,7 +5,7 @@ from langgraph.runtime import Runtime
 
 from app.agent.context import DataAgentContext
 from app.agent.state import DataAgentState
-from app.agent.llm import llm
+from app.agent.llm import fast_llm as llm
 from app.core.log import logger
 from app.prompt.prompt_loader import load_prompt
 

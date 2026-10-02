@@ -23,12 +23,13 @@
 </template>
 
 <script>
+import { apiGet, apiPost } from '../../utils/api.js'
 export default {
   data() { return { terms: [], loading: true, error: '' } },
   async mounted() {
     try {
-      const r = await fetch('/api/glossary', { headers: { Authorization: 'Bearer ' + localStorage.getItem('token') } });
-      const d = await r.json();
+      const d = await apiGet('/api/glossary');
+      
       this.terms = d.terms || [];
     } catch (e) { this.error = 'Failed to load glossary: ' + e.message; }
     finally { this.loading = false; }

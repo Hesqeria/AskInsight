@@ -26,6 +26,7 @@
   </div>
 </template>
 <script>
+import { apiGet, apiPost } from '../../utils/api.js'
 export default {
   data(){return{score:0,passed:false,dims:[],loading:false,smokeLoading:false,smokeResults:[]}},
   computed:{scoreColor(){return this.score>=90?'great':this.score>=70?'ok':'bad'}},
@@ -34,16 +35,14 @@ export default {
     async refresh(){
       this.loading=true;
       try{
-        const r=await fetch('/api/readiness',{headers:{Authorization:'Bearer '+localStorage.getItem('token')}});
-        const d=await r.json();
+        const d=await apiGet('/api/readiness');
         this.score=d.total_score;this.passed=d.passed;this.dims=d.dimensions||[];
       }catch(e){console.error(e)}finally{this.loading=false}
     },
     async smoke(){
       this.smokeLoading=true;
       try{
-        const r=await fetch('/api/readiness/agent',{method:'POST',headers:{Authorization:'Bearer '+localStorage.getItem('token')}});
-        const d=await r.json();
+        const d=await apiPost('/api/readiness/agent', {});
         this.smokeResults=d.tests||[];
       }catch(e){console.error(e)}finally{this.smokeLoading=false}
     }

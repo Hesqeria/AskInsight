@@ -1,0 +1,147 @@
+{
+  "run_id": "20260812_154458_a95698",
+  "adapter": "mock",
+  "data_root": "D:/datasets/livesqlbench-base-lite-sqlite",
+  "time": "2026-08-12T15:44:58.847170",
+  "total": 10,
+  "passed": 1,
+  "success_rate": 0.1,
+  "by_category": {
+    "Management": {
+      "total": 10,
+      "passed": 1,
+      "rate": 0.1
+    }
+  },
+  "by_difficulty": {
+    "Simple": {
+      "total": 7,
+      "passed": 0,
+      "rate": 0.0
+    },
+    "Moderate": {
+      "total": 3,
+      "passed": 1,
+      "rate": 0.3333
+    }
+  },
+  "failures": [
+    {
+      "instance_id": "alien_M_1",
+      "question": "Flag all signals with poor quality by updating their SignalClass to 'Weak' when they have a negative Signal-to-Noise Quality Indicator (SNQI) value.",
+      "category": "Management",
+      "difficulty": "Simple",
+      "ex_correct": false,
+      "pred_rows": 0,
+      "sol_rows": 0,
+      "error": "断言失败",
+      "match_reason": "Predicted SQL update did not update correctly: (0,) rows still have SNQI < 0 without 'Weak' flag.",
+      "pred_sql": "UPDATE Signals SET SignalClass = 'Weak' WHERE ( SnrRatio - 0.1 * ABS(NoiseFloorDbm) ) < 0",
+      "sol_sql": "UPDATE Signals SET SignalClass = 'Weak' WHERE ( SnrRatio - 0.1 * ABS(NoiseFloorDbm) ) < 0"
+    },
+    {
+      "instance_id": "alien_M_2",
+      "question": "Calculate the Detection Instrument Sensitivity Factor (DISF) using the formula with the following specific values: air temperature of 20°C, atmospheric transparency of 0.95, relative humidity of 45%, and lunar distance of 60 degrees. Return the calculated DISF value.",
+      "category": "Management",
+      "difficulty": "Simple",
+      "ex_correct": false,
+      "pred_rows": 0,
+      "sol_rows": 0,
+      "error": "test_case 异常: float() argument must be a string or a real number, not 'tuple'",
+      "match_reason": "Traceback (most recent call last):\n  File \"D:\\大模型\\智能问数\\AskInsight\\backend\\app\\eval\\evaluator\\management_ex.py\", line 183, in evaluate_management\n    result = test_fn(pred_sqls, sol_sqls, \"\", conn)\n  File \"<string>\", line 5, in test_case\nTypeError: float() argument must be a string or a real number, not 'tuple'\n",
+      "pred_sql": "SELECT (10.0 - ABS(20 - 15.0) / 10.0) * 0.95 * (1.0 - 45 / 200.0) * ((100.0 - 60) / 100.0) AS disf;",
+      "sol_sql": "SELECT (10.0 - ABS(20 - 15.0) / 10.0) * 0.95 * (1.0 - 45 / 200.0) * ((100.0 - 60) / 100.0) AS disf;"
+    },
+    {
+      "instance_id": "alien_M_3",
+      "question": "Create a view called vw_observation_quality that calculates and displays the Observation Quality Factor (OQF) for each signal detection. Please include the observatory station, telescope registry, signal registry, along with the computed AOI, LIF, and OQF values in the view output.",
+      "category": "Management",
+      "difficulty": "Moderate",
+      "ex_correct": false,
+      "pred_rows": 0,
+      "sol_rows": 0,
+      "error": "test_case 异常: float() argument must be a string or a real number, not 'tuple'",
+      "match_reason": "Traceback (most recent call last):\n  File \"D:\\大模型\\智能问数\\AskInsight\\backend\\app\\eval\\evaluator\\management_ex.py\", line 183, in evaluate_management\n    result = test_fn(pred_sqls, sol_sqls, \"\", conn)\n  File \"<string>\", line 28, in test_case\nTypeError: float() argument must be a string or a real number, not 'tuple'\n",
+      "pred_sql": "CREATE VIEW vw_observation_quality AS WITH calc AS ( SELECT o.ObservStation, t.TelescRegistry, s.SignalRegistry, o.AtmosTransparency, o.HumidityRate, o.WindSpeedMs, o.LunarDistDeg, t.PointAccArc, (o.AtmosTransparency * (1 - o.HumidityRate/100.0) * (1 - 0.02 * o.WindSpeedMs)) AS aoi, ((1 - o.LunarDistDeg/180.0) * (1 - o.AtmosTransparency)) AS lif FROM Observatories o INNER JOIN Telescopes t ON o.ObservStation = t.ObservStation INNER JOIN Signals s ON s.TelescRef = t.TelescRegistry ) SELECT ObservStation, TelescRegistry, SignalRegistry, aoi, lif, aoi * (1 - lif) * (CASE WHEN PointAccArc < 2 THEN 1 ELSE 2.0/PointAccArc END) AS oqf FROM calc;",
+      "sol_sql": "CREATE VIEW vw_observation_quality AS WITH calc AS ( SELECT o.ObservStation, t.TelescRegistry, s.SignalRegistry, o.AtmosTransparency, o.HumidityRate, o.WindSpeedMs, o.LunarDistDeg, t.PointAccArc, (o.AtmosTransparency * (1 - o.HumidityRate/100.0) * (1 - 0.02 * o.WindSpeedMs)) AS aoi, ((1 - o.LunarDistDeg/180.0) * (1 - o.AtmosTransparency)) AS lif FROM Observatories o INNER JOIN Telescopes t ON o.ObservStation = t.ObservStation INNER JOIN Signals s ON s.TelescRef = t.TelescRegistry ) SELECT ObservStation, TelescRegistry, SignalRegistry, aoi, lif, aoi * (1 - lif) * (CASE WHEN PointAccArc < 2 THEN 1 ELSE 2.0/PointAccArc END) AS oqf FROM calc;"
+    },
+    {
+      "instance_id": "alien_M_4",
+      "question": "I need you to set up an automatic system that flags whether signals in our database are good enough to analyze. Please add a new INTEGER column called 'IsAnalyzable' to the 'signals' table (using 1 for TRUE and 0 for FALSE), then create separate triggers for INSERT and UPDATE operations that automatically calculate each signal's Signal-to-Noise Quality Indicator (SNQI) and update the IsAnalyzable flag accordingly (set to 1 when SNQI > 0 and set to 0 otherwise). The triggers should fire after data changes and update the specific signal record using the signalregistry as the identifier.",
+      "category": "Management",
+      "difficulty": "Simple",
+      "ex_correct": false,
+      "pred_rows": 0,
+      "sol_rows": 0,
+      "error": "test_case 异常: 'tuple' object has no attribute 'strip'",
+      "match_reason": "Traceback (most recent call last):\n  File \"D:\\大模型\\智能问数\\AskInsight\\backend\\app\\eval\\evaluator\\management_ex.py\", line 183, in evaluate_management\n    result = test_fn(pred_sqls, sol_sqls, \"\", conn)\n  File \"<string>\", line 23, in test_case\nAttributeError: 'tuple' object has no attribute 'strip'\n",
+      "pred_sql": "ALTER TABLE signals ADD COLUMN IsAnalyzable INTEGER;",
+      "sol_sql": "ALTER TABLE signals ADD COLUMN IsAnalyzable INTEGER;; DROP TRIGGER IF EXISTS trg_set_analyzable_insert;; CREATE TRIGGER trg_set_analyzable_insert AFTER INSERT ON signals FOR EACH ROW BEGIN UPDATE signals SET IsAnalyzable = CASE WHEN (NEW.snrratio - 0.1 * ABS(NEW.noisefloordbm)) > 0 THEN 1 ELSE 0 END WHERE signalregistry = NEW.signalregistry; END;; DROP TRIGGER IF EXISTS trg_set_analyzable_update;; CREATE TRIGGER trg_set_analyzable_update AFTER UPDATE ON signals FOR EACH ROW BEGIN UPDATE signals SET IsAnalyzable = CASE WHEN (NEW.snrratio - 0.1 * ABS(NEW.noisefloordbm)) > 0 THEN 1 ELSE 0 END WHERE signalregistry = NEW.signalregistry; END;"
+    },
+    {
+      "instance_id": "alien_M_5",
+      "question": "We need to automatically identify telescopes experiencing significant interference from the moon and update their status accordingly. The system should calculate the Lunar Interference Factor (LIF) for each telescope and when the LIF score exceeds 0.5 - indicating substantial lunar interference - we should update those telescopes with a special 'Under Lunar Interference' equipment status.",
+      "category": "Management",
+      "difficulty": "Simple",
+      "ex_correct": false,
+      "pred_rows": 0,
+      "sol_rows": 0,
+      "error": "断言失败",
+      "match_reason": "Predicted SQL update did not update correctly: (0,) telescopes linked to high LIF observatories do not have 'Under Lunar Interference' status.",
+      "pred_sql": "UPDATE Telescopes SET EquipStatus = 'Under Lunar Interference' WHERE EXISTS( SELECT 1 FROM Observatories AS o WHERE o.ObservStation = Telescopes.ObservStation AND ( 1 - o.LunarDistDeg / 180.0 ) * ( 1 - o.AtmosTransparency ) > 0.5 )",
+      "sol_sql": "UPDATE Telescopes SET EquipStatus = 'Under Lunar Interference' WHERE EXISTS( SELECT 1 FROM Observatories AS o WHERE o.ObservStation = Telescopes.ObservStation AND ( 1 - o.LunarDistDeg / 180.0 ) * ( 1 - o.AtmosTransparency ) > 0.5 )"
+    },
+    {
+      "instance_id": "archeology_M_1",
+      "question": "We need to create a persistent table of all High Fidelity Mesh data for our archaeological analysis. Please set up a materialized view called 'high_fidelity_meshes'. The view should include the mesh's registry ID, site reference, equipment used, vertex and face counts, resolution in millimeters, geometric accuracy, and the calculated MCR value. Only include meshes that meet all the High Fidelity Mesh criteria.",
+      "category": "Management",
+      "difficulty": "Moderate",
+      "ex_correct": false,
+      "pred_rows": 0,
+      "sol_rows": 0,
+      "error": "断言失败",
+      "match_reason": "",
+      "pred_sql": "CREATE VIEW high_fidelity_meshes AS SELECT sm.facetregistry, sm.zoneref, sm.equipref, sm.facetverts, sm.facetfaces, sm.facetresmm, sm.geomdeltamm, ( CAST(sm.facetfaces AS REAL) / NULLIF(sm.facetverts, 0) / POWER(sm.facetresmm, 2) ) * 1000 AS mcr FROM scanmesh AS sm WHERE ( CAST(sm.facetfaces AS REAL) / NULLIF(sm.facetverts, 0) / POWER(sm.facetresmm, 2) ) * 1000 > 5.0 AND sm.facetresmm < 1.0 AND sm.geomdeltamm < 0.5",
+      "sol_sql": "CREATE VIEW high_fidelity_meshes AS SELECT sm.facetregistry, sm.zoneref, sm.equipref, sm.facetverts, sm.facetfaces, sm.facetresmm, sm.geomdeltamm, ( CAST(sm.facetfaces AS REAL) / NULLIF(sm.facetverts, 0) / POWER(sm.facetresmm, 2) ) * 1000 AS mcr FROM scanmesh AS sm WHERE ( CAST(sm.facetfaces AS REAL) / NULLIF(sm.facetverts, 0) / POWER(sm.facetresmm, 2) ) * 1000 > 5.0 AND sm.facetresmm < 1.0 AND sm.geomdeltamm < 0.5"
+    },
+    {
+      "instance_id": "archeology_M_2",
+      "question": "I want to calculate the Scan Resolution Index (SRI) for an archaeological scan with a resolution of 2.4 millimeters and point density of 42812. Please compute the SRI using the standard formula, including proper error handling for negative values and division by zero scenarios, and return null if any invalid conditions are detected. The calculation should convert the resolution to micrometers (multiply by 1000) and use base-10 logarithms in the formula.",
+      "category": "Management",
+      "difficulty": "Simple",
+      "ex_correct": false,
+      "pred_rows": 0,
+      "sol_rows": 0,
+      "error": "test_case 异常: float() argument must be a string or a real number, not 'tuple'",
+      "match_reason": "Traceback (most recent call last):\n  File \"D:\\大模型\\智能问数\\AskInsight\\backend\\app\\eval\\evaluator\\management_ex.py\", line 183, in evaluate_management\n    result = test_fn(pred_sqls, sol_sqls, \"\", conn)\n  File \"<string>\", line 5, in test_case\nTypeError: float() argument must be a string or a real number, not 'tuple'\n",
+      "pred_sql": "SELECT CASE WHEN 2.4 <= 0 OR 42812 <= 0 THEN NULL WHEN LOG10(42812) = 0 THEN NULL ELSE (LOG10(2.4 * 1000.0) / LOG10(42812)) * 5.0 END AS sri;",
+      "sol_sql": "SELECT CASE WHEN 2.4 <= 0 OR 42812 <= 0 THEN NULL WHEN LOG10(42812) = 0 THEN NULL ELSE (LOG10(2.4 * 1000.0) / LOG10(42812)) * 5.0 END AS sri;"
+    },
+    {
+      "instance_id": "archeology_M_3",
+      "question": "Create a view called view_premium_quality_scans that identifies high-quality archaeological scans. This view should include the Scan ID, Project Reference, Site Reference, Scan Timestamp, Scan Resolution (mm), Point Density (points/m²), Coverage (%), Overlap (%), and Noise Level (dB). Please include all scans, even those that may not yet have associated point cloud data. The view should identify scans that meet the criteria for both a High Resolution Scan and Comprehensive Coverage, and also have a Noise Level less than 1.5.",
+      "category": "Management",
+      "difficulty": "Simple",
+      "ex_correct": false,
+      "pred_rows": 0,
+      "sol_rows": 0,
+      "error": "断言失败",
+      "match_reason": "",
+      "pred_sql": "CREATE VIEW view_premium_quality_scans AS SELECT s.QuestRegistry, s.ArcRef, s.ZoneRef, s.ChronoTag, spc.ScanResolMm, spc.PointDense, spc.CoverPct, spc.LapPct, spc.NoiseDb FROM scans s LEFT JOIN scanpointcloud spc ON s.ArcRef = spc.ArcRef AND s.CrewRef = spc.CrewRef WHERE spc.ScanResolMm <= 1.0 AND spc.PointDense >= 1000 AND spc.CoverPct >= 95.0 AND spc.LapPct >= 30.0 AND spc.NoiseDb < 1.5;",
+      "sol_sql": "CREATE VIEW view_premium_quality_scans AS SELECT s.QuestRegistry, s.ArcRef, s.ZoneRef, s.ChronoTag, spc.ScanResolMm, spc.PointDense, spc.CoverPct, spc.LapPct, spc.NoiseDb FROM scans s LEFT JOIN scanpointcloud spc ON s.ArcRef = spc.ArcRef AND s.CrewRef = spc.CrewRef WHERE spc.ScanResolMm <= 1.0 AND spc.PointDense >= 1000 AND spc.CoverPct >= 95.0 AND spc.LapPct >= 30.0 AND spc.NoiseDb < 1.5;"
+    },
+    {
+      "instance_id": "archeology_M_4",
+      "question": "A view named site_esi is required. This view should determine the Environmental Suitability Index for each site. The output should include the Zone Reference and the calculated ESI value, rounded to two decimal places.",
+      "category": "Management",
+      "difficulty": "Simple",
+      "ex_correct": false,
+      "pred_rows": 0,
+      "sol_rows": 0,
+      "error": "断言失败",
+      "match_reason": "",
+      "pred_sql": "CREATE VIEW site_esi AS SELECT zoneref, ROUND( 100 - 2.5 * ABS(ambictemp - 20) - POWER(ABS(humepct - 50) / 2, 1.5) - 600 / ( illumelux + 100 ), 2 ) AS esi FROM scanenvironment",
+      "sol_sql": "CREATE VIEW site_esi AS SELECT zoneref, ROUND( 100 - 2.5 * ABS(ambictemp - 20) - POWER(ABS(humepct - 50) / 2, 1.5) - 600 / ( illumelux + 100 ), 2 ) AS esi FROM scanenvironment"
+    }
+  ]
+}

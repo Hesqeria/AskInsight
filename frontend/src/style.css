@@ -1,25 +1,59 @@
-/* Minimal reset - design system in styles/variables.css */
+/* ============================================================
+   AskInsight — base layer(墨玉 · Ink & Jade)
+   ============================================================ */
 *,
 *::before,
 *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body { height: 100%; }
+
 body {
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
+  font-family: var(--font-ui);
+  line-height: 1.55;
   color: var(--color-text);
-  background: var(--color-bg);
+  background-color: var(--color-bg);
+  background-image:
+    radial-gradient(1200px 600px at -5% -10%, rgba(14, 124, 107, 0.06), transparent 60%),
+    radial-gradient(900px 500px at 105% 108%, rgba(201, 130, 46, 0.05), transparent 55%);
+  background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 #app { height: 100%; }
 
+::selection { background: rgba(14, 124, 107, 0.22); }
+
 a { color: var(--color-primary); text-decoration: none; }
-a:hover { text-decoration: underline; }
+a:hover { text-decoration: none; opacity: 0.85; }
 
 button { font-family: inherit; }
 
-::-webkit-scrollbar { width: 6px; }
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--color-text-muted); }
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--color-text-muted); background-clip: content-box; }
+
+table { font-variant-numeric: tabular-nums; }
+
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+.el-dialog, .el-drawer { border-radius: var(--radius-lg); }

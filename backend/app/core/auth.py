@@ -27,7 +27,7 @@ if not ADMIN_PASSWORD_HASH:
 
 USERS = {"admin": {"password_hash": ADMIN_PASSWORD_HASH, "role": "admin"}}
 JWT_EXPIRE = 86400
-RATE_LIMIT = 10
+RATE_LIMIT = int(os.getenv("RATE_LIMIT", "10"))  # 0 = disable
 
 # Lua script for atomic incr + expire (BT-12 race condition fix)
 _RATE_LUA = """
@@ -68,7 +68,22 @@ async def create_token(username: str) -> str:
     return token
 
 
+def verify_token_factory(lane: str = "query", limit: int | None = None):
+    """Lane-aware auth dependency. Each lane gets its own rate bucket."""
+    import functools
+
+    @functools.wraps(verify_token)
+    async def _verify(request: Request) -> dict:
+        return await _verify_token_impl(request, lane=lane, limit=limit)
+    return _verify
+
+
 async def verify_token(request: Request) -> dict:
+    return await _verify_token_impl(request)
+
+
+async def _verify_token_impl(request: Request, lane: str = "query",
+                             limit: int | None = None) -> dict:
     """FastAPI dependency: JWT verify + optional Redis session + rate limit."""
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
@@ -96,10 +111,11 @@ async def verify_token(request: Request) -> dict:
     # Rate limiting (atomic Lua, graceful degradation)
     if _redis_available():
         try:
-            rate_key = f"rate:{payload['sub']}"
+            eff_limit = RATE_LIMIT if limit is None else limit
+            rate_key = f"rate:{lane}:{payload['sub']}"
             count = await redis_client_manager.client.eval(_RATE_LUA, 1, rate_key, 60)
-            if count > RATE_LIMIT:
-                raise HTTPException(status_code=429, detail=f"Too many requests (limit {RATE_LIMIT}/min)")
+            if eff_limit and count > eff_limit:
+                raise HTTPException(status_code=429, detail=f"Too many requests (limit {eff_limit}/min)")
         except HTTPException:
             raise
         except Exception as e:

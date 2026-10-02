@@ -100,6 +100,7 @@ test.describe('Dashboard visualization', () => {
   test('empty dashboard shows empty state', async ({ page }) => {
     await page.addInitScript(() => {
       localStorage.setItem('askinsight_dashboard', '[]')
+      localStorage.setItem('token', 'fake-test-token') // auth guard (login gate)
     })
     await page.goto('/dashboard')
     await expect(page.locator('.empty-state')).toBeVisible()

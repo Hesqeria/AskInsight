@@ -27,6 +27,7 @@
 </template>
 
 <script>
+import { apiGet, apiPost } from '../../utils/api.js'
 export default {
   data() {
     return {
@@ -36,8 +37,8 @@ export default {
   },
   async mounted() {
     try {
-      const r = await fetch('/api/admin/llm/providers', { headers: { Authorization: 'Bearer ' + localStorage.getItem('token') } });
-      const d = await r.json();
+      const d = await apiGet('/api/admin/llm/providers');
+      
       this.providers = d.providers || [];
       this.selected = this.providers[0] || '';
     } catch (e) { this.switchMsg = 'Failed to load providers: ' + e.message; }
@@ -46,11 +47,8 @@ export default {
     async switchProvider() {
       this.switching = true; this.switchMsg = '';
       try {
-        const r = await fetch('/api/admin/llm/switch', {
-          method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('token') },
-          body: JSON.stringify({ provider: this.selected }),
-        });
-        const d = await r.json();
+        const d = await apiPost('/api/admin/llm/switch', JSON.stringify({ provider: this.selected }));
+        
         this.switchMsg = d.status === 'ok' ? `Switched to ${d.provider}` : (d.message || 'Failed');
       } catch (e) { this.switchMsg = 'Request failed: ' + e.message; }
       finally { this.switching = false; }

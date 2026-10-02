@@ -1,0 +1,29 @@
+{
+  "run_id": "20260812_142537_9a646f",
+  "adapter": "mock",
+  "data_root": "C:\\Users\\85246\\AppData\\Local\\Temp\\tmp6l99kj0h",
+  "time": "2026-08-12T14:25:37.870812",
+  "total": 2,
+  "passed": 2,
+  "success_rate": 1.0,
+  "by_category": {
+    "Query": {
+      "total": 2,
+      "passed": 2,
+      "rate": 1.0
+    }
+  },
+  "by_difficulty": {
+    "Simple": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1.0
+    },
+    "Moderate": {
+      "total": 1,
+      "passed": 1,
+      "rate": 1.0
+    }
+  },
+  "failures": []
+}

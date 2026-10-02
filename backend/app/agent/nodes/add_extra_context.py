@@ -14,7 +14,16 @@ async def add_extra_context(state: DataAgentState, runtime: Runtime[DataAgentCon
             logger.warning("DW repository unavailable, skipping context supplement")
             return {}
 
-        today = datetime.today()
+        # Align "today" to the warehouse freeze date so relative dates
+        # (昨天/本月/最近7天) resolve into windows that actually hold data.
+        today = None
+        try:
+            from app.core.data_today import get_data_today
+            today = await get_data_today(dw_repo.session)
+        except Exception as dt_err:
+            logger.debug(f"data-today lookup skipped: {dt_err}")
+        if today is None:
+            today = datetime.today().date()
         date_info = DateInfoState(
             date=today.strftime("%Y-%m-%d"),
             current_date_id=int(today.strftime("%Y%m%d")),

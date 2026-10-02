@@ -11,12 +11,17 @@
         </button>
       </div>
     </div>
+    <drill-breadcrumb
+      v-if="drillPath.length"
+      :path="drillPath"
+      @navigate="(idx) => emit('drill-navigate', { widget, idx })"
+    />
     <div class="widget-body">
       <chart-renderer
         :type="config.type"
         :category-key="config.categoryKey"
         :value-keys="config.valueKeys"
-        :rows="widget.rows || rows"
+        :rows="displayRows"
         :sql="widget.sql"
         @drill-down="onDrillDown"
       />
@@ -27,14 +32,34 @@
 <script setup>
 import { computed } from 'vue'
 import ChartRenderer from '../chart/ChartRenderer.vue'
+import DrillBreadcrumb from './DrillBreadcrumb.vue'
+import { useDashboardFilters } from '../../composables/useDashboardFilters.js'
 
 const props = defineProps({
   widget: { type: Object, required: true },
+  // Fallback rows (already globally filtered) used when the widget has
+  // no rows of its own.
   rows: { type: Array, default: () => [] },
+  // Global dashboard filters that must also apply to the widget's own
+  // rows. Previously this prop existed but was ignored whenever
+  // `widget.rows` was set, so the FilterBar had no effect.
+  filters: { type: Array, default: () => [] },
+  // Per-widget drill-down path (array of { field, value }).
+  drillPath: { type: Array, default: () => [] },
 })
-const emit = defineEmits(['config', 'remove', 'drill-down'])
+const emit = defineEmits(['config', 'remove', 'drill-down', 'drill-navigate'])
 
 const config = computed(() => props.widget.config || {})
+const { applyFilters } = useDashboardFilters()
+
+// Source rows: prefer the widget's own rows; fall back to the parent-
+// supplied (globally filtered) rows. Either way we then layer the
+// dashboard filters on top so the FilterBar affects every widget.
+const sourceRows = computed(() => {
+  const own = props.widget.rows
+  return Array.isArray(own) && own.length ? own : props.rows
+})
+const displayRows = computed(() => applyFilters(sourceRows.value, props.filters))
 
 function onDrillDown(event) {
   emit('drill-down', { widget: props.widget, ...event })

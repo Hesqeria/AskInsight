@@ -3,7 +3,7 @@ from langchain_core.messages import HumanMessage
 from langgraph.runtime import Runtime
 from app.agent.context import DataAgentContext
 from app.agent.state import DataAgentState
-from app.agent.llm import llm
+from app.agent.llm import fast_llm as llm
 from app.core.log import logger
 
 MAX_HISTORY_ITEMS = 3
@@ -36,11 +36,38 @@ def _clean_history(history: list) -> str:
     return "\n".join(cleaned)
 
 
+_FRAGMENT_MARKERS = ("那", "呢", "它", "这个", "那个", "再", "换成", "改看",
+                     "对比下", "same", "that", "this", "what about")
+
+
+def _needs_rewrite(query: str) -> bool:
+    """Fragments ("那上个月呢") need history; standalone questions pass
+    through without paying an LLM roundtrip."""
+    if len(query) <= 10:
+        return True
+    return any(m in query for m in _FRAGMENT_MARKERS)
+
+
 async def resolve_context(state: DataAgentState, runtime: Runtime[DataAgentContext]):
     history = state.get("history", [])
     query = state.get("query", "")
-    if not history:
+    if not history or not _needs_rewrite(query):
         return {"query": query}
+    # M4 FR4: consume the COMPACTED view. Compaction is event-logged
+    # (compaction/start|summary|end) and only triggers under token
+    # pressure - short sessions pass through untouched.
+    try:
+        from app.services.compaction import maybe_compact
+        compacted = await maybe_compact(history)
+        if compacted.pruned or compacted.summarized:
+            logger.info(
+                f"history compacted: pruned={compacted.pruned} "
+                f"summarized={compacted.summarized} "
+                f"llm={compacted.used_llm}"
+            )
+            state["history"] = history = compacted.history
+    except Exception as e:
+        logger.warning(f"compaction skipped (non-fatal): {e}")
     try:
         history_text = _clean_history(history)
         prompt = RESOLVE_PROMPT.format(history=history_text, query=query[:MAX_HISTORY_LENGTH])

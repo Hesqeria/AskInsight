@@ -37,10 +37,13 @@
       <dashboard-grid
         :widgets="widgets"
         :rows="filteredRows"
+        :filters="filters"
+        :drill-paths="drill.state.paths"
         @update:layout="onLayoutUpdate"
         @config="openConfig"
         @remove="removeWidget"
         @drill-down="onDrillDown"
+        @drill-navigate="onDrillNavigate"
       />
     </div>
 
@@ -69,6 +72,7 @@ import TemplateGallery from '../components/dashboard/TemplateGallery.vue'
 import { useDashboardFilters } from '../composables/useDashboardFilters.js'
 import { useChartExport } from '../composables/useChartExport.js'
 import { useDashboardTemplates } from '../composables/useDashboardTemplates.js'
+import { useDrillDown } from '../composables/useDrillDown.js'
 
 const STORAGE_KEY = 'askinsight_dashboard'
 function loadCards() {
@@ -90,6 +94,7 @@ const gridContainer = ref(null)
 const { applyFilters } = useDashboardFilters()
 const { downloadDashboardPDF } = useChartExport()
 const { applyTemplate: getTemplateWidgets } = useDashboardTemplates()
+const drill = useDrillDown()
 
 function normalizeCard(card, idx) {
   const keys = card.columns || (card.rows?.length ? Object.keys(card.rows[0]) : [])
@@ -154,7 +159,13 @@ function onConfigApply() {
   showConfig.value = false
 }
 
-function onFilterApply() {}
+function onFilterApply() {
+  // Filters are v-modeled into `filters` by FilterBar; nothing else to
+  // do here. We keep the handler so the apply event stays observable
+  // (e.g. for analytics or to clear drill-down state below).
+  // Drill-down paths are scoped to a specific widget/value chain, so
+  // they survive normal filter changes.
+}
 
 function onLayoutUpdate(patch) {
   let changed = false
@@ -170,7 +181,32 @@ function onLayoutUpdate(patch) {
 }
 
 function onDrillDown({ widget, field, value }) {
-  filters.value = [...filters.value, { field, operator: 'eq', value }]
+  // Record the drill step for this widget so DrillBreadcrumb can render
+  // the path and the user can navigate back.
+  const id = String(widget?.id)
+  if (!id) return
+  drill.push(id, field, value)
+  // Drill-down also implies a filter on the rest of the dashboard so
+  // related widgets narrow their context too. Append as a dashboard
+  // filter (deduped by field+value+operator).
+  const exists = filters.value.some(
+    f => f.field === field && f.operator === 'eq' && f.value === value)
+  if (!exists) {
+    filters.value = [...filters.value, { field, operator: 'eq', value }]
+  }
+}
+
+function onDrillNavigate({ widget, idx }) {
+  const id = String(widget?.id)
+  if (!id) return
+  // Drop drill-down filters that were added after the clicked crumb.
+  const path = drill.getPath(id)
+  const removed = path.slice(idx + 1)
+  drill.slice(id, idx)
+  if (removed.length) {
+    filters.value = filters.value.filter(f =>
+      !removed.some(r => r.field === f.field && r.value === f.value && f.operator === 'eq'))
+  }
 }
 
 function applyTemplate(key) {

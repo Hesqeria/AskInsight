@@ -1,6 +1,15 @@
 """P6-04: Root cause analyzer - evidence collection + LLM reasoning."""
+import json
+import re
 import time
 
+
+def _extract_json_object(content):
+    """Tolerantly extract the first JSON object from an LLM response.
+    Delegates to app.core.json_guard.safe_json_parse (single source of
+    truth - three agent copies of this existed and drifted)."""
+    from app.core.json_guard import safe_json_parse
+    return safe_json_parse(content)
 
 class Evidence:
     def __init__(self, source, content, relevance=0.5):
@@ -89,7 +98,56 @@ class RootCauseAnalyzer:
                 NL + "输出JSON: root_cause/confidence/suggested_fixes/timeline")
 
     def _parse(self, content, incident, evidence):
-        return self._rule_based(incident, evidence)
+        """Parse the LLM's JSON response into a RootCauseReport. The
+        prompt requests:
+            {"root_cause": str, "confidence": float,
+             "suggested_fixes": [{"description": str, "runbook_id": str,
+                                   "risk_level": str, "estimated_impact": str}],
+             "timeline": [{"t": epoch, "event": str}]}
+        Falls back to rule-based analysis if parsing or validation fails.
+        """
+        data = _extract_json_object(content)
+        if data is None:
+            return self._rule_based(incident, evidence)
+
+        try:
+            root_cause = str(data.get("root_cause") or "").strip()
+            if not root_cause:
+                return self._rule_based(incident, evidence)
+
+            confidence = float(data.get("confidence", 0.0))
+            if not 0.0 <= confidence <= 1.0:
+                confidence = max(0.0, min(1.0, confidence))
+
+            fixes = []
+            for raw in data.get("suggested_fixes") or []:
+                if isinstance(raw, str):
+                    fixes.append(SuggestedFix(raw))
+                    continue
+                if not isinstance(raw, dict):
+                    continue
+                desc = str(raw.get("description") or "").strip()
+                if not desc:
+                    continue
+                fixes.append(SuggestedFix(
+                    description=desc,
+                    runbook_id=raw.get("runbook_id"),
+                    risk_level=str(raw.get("risk_level") or "low_risk"),
+                    estimated_impact=str(raw.get("estimated_impact") or ""),
+                ))
+
+            timeline = data.get("timeline") or []
+
+            return RootCauseReport(
+                incident_id=incident.incident_id,
+                root_cause=root_cause,
+                confidence=confidence,
+                evidence=evidence,
+                suggested_fixes=fixes,
+                timeline=timeline,
+            )
+        except (TypeError, ValueError, AttributeError):
+            return self._rule_based(incident, evidence)
 
     def _rule_based(self, incident, evidence):
         cause = "data pipeline failure: upstream dag failed, downstream table not refreshed"

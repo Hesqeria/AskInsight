@@ -31,8 +31,36 @@ class LLMRouter:
                 return self._call(model_name, messages, temperature, max_tokens, timeout)
             except Exception as e:
                 last_err = e
-                self._mark_unavailable(model_name)
+                # Only circuit-break on transient/network-class errors so a
+                # permanent 4xx (bad key, malformed request, content-policy
+                # 400) doesn't disable the primary model for 600s and force
+                # every subsequent request through the fallback.
+                if self._is_transient(e):
+                    self._mark_unavailable(model_name)
         raise RuntimeError(f"All LLM models failed: {last_err}")
+
+    @staticmethod
+    def _is_transient(exc) -> bool:
+        """Classify whether an exception is worth circuit-breaking on.
+        Treats httpx transport errors and 5xx HTTP statuses as transient.
+        Treats 4xx (auth, bad request, content filter) as caller-side
+        errors that will recur, so we leave the model available."""
+        # httpx raises HTTPStatusError for non-2xx; .response is set.
+        resp = getattr(exc, "response", None)
+        if resp is not None:
+            try:
+                status = int(getattr(resp, "status_code", 0))
+            except (TypeError, ValueError):
+                status = 0
+            if 500 <= status < 600:
+                return True
+            # 429 Too Many Requests is transient.
+            if status == 429:
+                return True
+            return False
+        # No response attached -> likely a transport/timeout error
+        # (ConnectError, ReadTimeout, etc.) which is transient.
+        return True
 
     def _call(self, model, messages, temperature, max_tokens, timeout):
         body = {"model": model, "messages": messages,

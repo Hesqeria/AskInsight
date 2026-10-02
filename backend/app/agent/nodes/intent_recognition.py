@@ -3,7 +3,7 @@ import json
 from langgraph.runtime import Runtime
 from app.agent.context import DataAgentContext
 from app.agent.state import DataAgentState
-from app.agent.llm import llm
+from app.agent.llm import fast_llm as llm
 from app.core.log import logger
 from app.core.llm_retry import safe_ainvoke
 
@@ -36,6 +36,8 @@ async def intent_recognition(state: DataAgentState, runtime: Runtime[DataAgentCo
         intent = data.get("intent", "query")
         reply = data.get("reply", "")
         logger.info(f"Intent recognition: {intent} | reply={reply[:30]}")
+        from app.agent.events import emit
+        emit("intent/resolved", {"intent": intent, "source": "llm"})
         # Chitchat: output the reply directly via writer (frontend displays after receiving result)
         if intent == "chat" and reply:
             writer({"result": [{"reply": reply}]})

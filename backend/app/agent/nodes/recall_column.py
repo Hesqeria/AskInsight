@@ -7,7 +7,7 @@ from app.agent.state import DataAgentState
 from app.agent.keywords import sanitize_keywords
 from app.core.log import logger
 from app.prompt.prompt_loader import load_prompt
-from app.agent.llm import llm
+from app.agent.llm import fast_llm as llm
 
 
 async def recall_column(state: DataAgentState, runtime: Runtime[DataAgentContext]):
@@ -25,11 +25,30 @@ async def recall_column(state: DataAgentState, runtime: Runtime[DataAgentContext
                 input_variables=["query"],
             )
             chain = prompt | llm | JsonOutputParser()
-            result = await chain.ainvoke({"query": query})
+            # Latency gate: a single reasoning model makes each expansion
+            # cost ~30s. Jieba keywords usually suffice - only expand via
+            # LLM when base keywords are scarce.
+            import os as _os
+            _min_kw = int(_os.getenv("AUX_EXPAND_MIN_KEYWORDS", "3"))
+            if len(set(keywords)) >= _min_kw:
+                result = []
+            else:
+                result = await chain.ainvoke({"query": query})
             keywords = set(list(keywords) + list(result))
         except Exception as e:
             logger.warning(f"LLM keyword expansion failed, using original keywords: {e}")
             keywords = set(keywords)
+
+        # Batch-warm all keyword embeddings in one gateway call per chunk
+        # (serial/throttled per-keyword embeds cost 10-60s on cold queries).
+        try:
+            from app.core.embed_cache import warm_many
+            warmed = await warm_many(embedding_client,
+                                     list(keywords) + [query])
+            if warmed:
+                logger.info(f"embed batch-warmed {warmed} terms")
+        except Exception as we:
+            logger.debug(f"embed warm skipped: {we}")
 
         retrieved_map = {}
         # BT-19: Milvus graceful degradation to keyword matching
@@ -44,9 +63,23 @@ async def recall_column(state: DataAgentState, runtime: Runtime[DataAgentContext
             return {"retrieved_columns": [], "recall_mode": "keyword_fallback"}
 
         keywords = sanitize_keywords(keywords)
-        for kw in keywords[:20]:
-            embedding = await embedding_client.aembed_query(kw)
-            payloads = await column_repository.async_search_safe(embedding, limit=10)
+        # Parallel embed+search: serial per-keyword embedding costs ~0.9s
+        # each (up to 20 kw = ~18s wall); gather brings it to ~1s.
+        import asyncio as _aio
+
+        from app.core.embed_cache import embed_cached
+
+        async def _one(kw):
+            embedding = await embed_cached(embedding_client, kw)
+            if embedding is None:
+                embedding = await embedding_client.aembed_query(kw)
+            return await column_repository.async_search_safe(embedding, limit=10)
+
+        results = await _aio.gather(
+            *[_one(kw) for kw in list(keywords)[:20]], return_exceptions=True)
+        for payloads in results:
+            if isinstance(payloads, BaseException):
+                continue
             for p in payloads:
                 cid = p.get("id")
                 if cid and cid not in retrieved_map:

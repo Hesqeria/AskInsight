@@ -1,0 +1,74 @@
+{
+  "run_id": "20260812_160536_6410c6",
+  "adapter": "mock",
+  "data_root": "D:/datasets/livesqlbench-base-lite-sqlite",
+  "time": "2026-08-12T16:06:43.830893",
+  "total": 90,
+  "passed": 87,
+  "success_rate": 0.9667,
+  "by_category": {
+    "Management": {
+      "total": 90,
+      "passed": 87,
+      "rate": 0.9667
+    }
+  },
+  "by_difficulty": {
+    "Simple": {
+      "total": 49,
+      "passed": 48,
+      "rate": 0.9796
+    },
+    "Moderate": {
+      "total": 35,
+      "passed": 34,
+      "rate": 0.9714
+    },
+    "Challenging": {
+      "total": 6,
+      "passed": 5,
+      "rate": 0.8333
+    }
+  },
+  "failures": [
+    {
+      "instance_id": "fake_M_4",
+      "question": "First, ensure the account table has a text column named review_priority for flagging purposes. Then, identify accounts that are considered Trusted Accounts but also meet an Account Inactivity condition. For accounts that are both Trusted Accounts and meet the Account Inactivity condition, update their review_priority column, setting it to the value 'Review_Inactive_Trusted'. When calculating PCI or checking last detection/activity times, consider all accounts, appropriately handling missing underlying data like scores or detections (e.g., using COALESCE or checking for NULLs).",
+      "category": "Management",
+      "difficulty": "Challenging",
+      "ex_correct": false,
+      "pred_rows": 0,
+      "sol_rows": 0,
+      "error": "pred_sql 执行失败: no such column: review_priority",
+      "match_reason": "",
+      "pred_sql": "WITH TrustedAccountStatus AS (SELECT a.accindex FROM account a LEFT JOIN profile p ON a.accindex = p.profaccref LEFT JOIN sessionbehavior sb ON p.profkey = sb.sessprofref LEFT JOIN contentbehavior cb ON sb.sessref = cb.cntsessref LEFT JOIN moderationaction modact ON cb.cntref = modact.macntref LEFT JOIN securitydetection sd ON modact.masedetref = sd.secdetkey WHERE (0.3 * COALESCE(modact.credscore, 0) + 0.3 * COALESCE(modact.reputscore, 0) + 0.4 * COALESCE(CAST(json_extract(p.profile_composition, '$.completeness') AS REAL), 0)) > 0.8 GROUP BY a.accindex HAVING MAX(sd.detecttime) IS NULL OR MAX(sd.detecttime) < date('now', '-180 days')), AccountLastActivity AS (SELECT a.accindex, MAX(sd.detecttime) as last_activity_proxy_time FROM account a JOIN profile p ON a.accindex = p.profaccref JOIN sessionbehavior sb ON p.profkey = sb.sessprofref JOIN contentbehavior cb ON sb.sessref = cb.cntsessref JOIN moderationaction modact ON cb.cntref = modact.macntref JOIN securitydetection sd ON modact.masedetref = sd.secdetkey GROUP BY a.accindex) UPDATE account SET review_priority = 'Review_Inactive_Trusted' WHERE accindex IN (SELECT tas.accindex FROM TrustedAccountStatus tas JOIN AccountLastActivity ala ON tas.accindex = ala.accindex WHERE ala.last_activity_proxy_time < date('now', '-90 days'));",
+      "sol_sql": "WITH TrustedAccountStatus AS (SELECT a.accindex FROM account a LEFT JOIN profile p ON a.accindex = p.profaccref LEFT JOIN sessionbehavior sb ON p.profkey = sb.sessprofref LEFT JOIN contentbehavior cb ON sb.sessref = cb.cntsessref LEFT JOIN moderationaction modact ON cb.cntref = modact.macntref LEFT JOIN securitydetection sd ON modact.masedetref = sd.secdetkey WHERE (0.3 * COALESCE(modact.credscore, 0) + 0.3 * COALESCE(modact.reputscore, 0) + 0.4 * COALESCE(CAST(json_extract(p.profile_composition, '$.completeness') AS REAL), 0)) > 0.8 GROUP BY a.accindex HAVING MAX(sd.detecttime) IS NULL OR MAX(sd.detecttime) < date('now', '-180 days')), AccountLastActivity AS (SELECT a.accindex, MAX(sd.detecttime) as last_activity_proxy_time FROM account a JOIN profile p ON a.accindex = p.profaccref JOIN sessionbehavior sb ON p.profkey = sb.sessprofref JOIN contentbehavior cb ON sb.sessref = cb.cntsessref JOIN moderationaction modact ON cb.cntref = modact.macntref JOIN securitydetection sd ON modact.masedetref = sd.secdetkey GROUP BY a.accindex) UPDATE account SET review_priority = 'Review_Inactive_Trusted' WHERE accindex IN (SELECT tas.accindex FROM TrustedAccountStatus tas JOIN AccountLastActivity ala ON tas.accindex = ala.accindex WHERE ala.last_activity_proxy_time < date('now', '-90 days'));"
+    },
+    {
+      "instance_id": "gaming_M_4",
+      "question": "Delete all audio devices from the audioandmedia table that are identified as Subpar Audio Devices. After deletion, return the audio device registry ID, sound level in decibels, and total harmonic distortion percentage of the deleted devices.",
+      "category": "Management",
+      "difficulty": "Moderate",
+      "ex_correct": false,
+      "pred_rows": 0,
+      "sol_rows": 0,
+      "error": "断言失败",
+      "match_reason": "The RETURNING clause should return 3 columns (audregistry, sndleveldb, thdpct)",
+      "pred_sql": "WITH audio_quality_metrics AS ( SELECT a.audregistry, a.freqresp, a.thdpct, a.noiseisodb, (1 - a.thdpct/2.0) * (a.spksensedb/100.0) * (1 - a.audlatms/100.0) * 10 AS aqi, CASE WHEN instr(a.freqresp, 'Hz') > 0 THEN CAST(substr(a.freqresp, 1, instr(a.freqresp,'Hz')-1) AS INTEGER) ELSE NULL END AS hz_val, CASE WHEN instr(a.freqresp, 'kHz') > 0 THEN CAST(substr(a.freqresp, 1, instr(a.freqresp,'kHz')-1) AS INTEGER) ELSE NULL END AS khz_val FROM audioandmedia a ), substandard_devices AS ( SELECT audregistry FROM audio_quality_metrics WHERE aqi <= 8.0 OR thdpct >= 0.5 OR noiseisodb <= 15 OR hz_val IS NULL OR hz_val > 10 OR khz_val IS NULL OR khz_val < 22 ) DELETE FROM audioandmedia WHERE audregistry IN (SELECT audregistry FROM substandard_devices) RETURNING audregistry, sndleveldb, thdpct;",
+      "sol_sql": "WITH audio_quality_metrics AS ( SELECT a.audregistry, a.freqresp, a.thdpct, a.noiseisodb, (1 - a.thdpct/2.0) * (a.spksensedb/100.0) * (1 - a.audlatms/100.0) * 10 AS aqi, CASE WHEN instr(a.freqresp, 'Hz') > 0 THEN CAST(substr(a.freqresp, 1, instr(a.freqresp,'Hz')-1) AS INTEGER) ELSE NULL END AS hz_val, CASE WHEN instr(a.freqresp, 'kHz') > 0 THEN CAST(substr(a.freqresp, 1, instr(a.freqresp,'kHz')-1) AS INTEGER) ELSE NULL END AS khz_val FROM audioandmedia a ), substandard_devices AS ( SELECT audregistry FROM audio_quality_metrics WHERE aqi <= 8.0 OR thdpct >= 0.5 OR noiseisodb <= 15 OR hz_val IS NULL OR hz_val > 10 OR khz_val IS NULL OR khz_val < 22 ) DELETE FROM audioandmedia WHERE audregistry IN (SELECT audregistry FROM substandard_devices) RETURNING audregistry, sndleveldb, thdpct;"
+    },
+    {
+      "instance_id": "gaming_M_5",
+      "question": "I need a new system to track which gaming devices are suitable for esports tournaments. Create a main table called 'tournament_device_assessment' that is divided into separate sub-tables for mice, keyboards, and controllers (include both controller and gamepad). For each device, I want to record its ID, the date it was assessed, its type, its Competitive Gaming Performance Index score, latency, polling rate, wireless latency (if applicable), whether it meets the requirements to be a Tournament Standard Device, and the version of the standard used. Make sure that the system enforces that only devices that actually meet the Tournament Standard Device criteria can be marked as meeting the standard.",
+      "category": "Management",
+      "difficulty": "Simple",
+      "ex_correct": false,
+      "pred_rows": 0,
+      "sol_rows": 0,
+      "error": "断言失败",
+      "match_reason": "",
+      "pred_sql": "CREATE TABLE tournament_device_assessment ( device_id TEXT NOT NULL, assessment_date TEXT NOT NULL, device_type TEXT NOT NULL, cgpi_score REAL NOT NULL, latency_ms REAL NOT NULL, poll_rate_hz INTEGER NOT NULL, wireless_latency_var REAL, meets_standard INTEGER NOT NULL, standard_version TEXT NOT NULL, CONSTRAINT tournament_standard_check CHECK ( (meets_standard = 0) OR (cgpi_score > 8.0 AND latency_ms < 2.0 AND poll_rate_hz >= 1000 AND (wireless_latency_var IS NULL OR wireless_latency_var < 1.0)) ) );",
+      "sol_sql": "CREATE TABLE tournament_device_assessment ( device_id TEXT NOT NULL, assessment_date TEXT NOT NULL, device_type TEXT NOT NULL, cgpi_score REAL NOT NULL, latency_ms REAL NOT NULL, poll_rate_hz INTEGER NOT NULL, wireless_latency_var REAL, meets_standard INTEGER NOT NULL, standard_version TEXT NOT NULL, CONSTRAINT tournament_standard_check CHECK ( (meets_standard = 0) OR (cgpi_score > 8.0 AND latency_ms < 2.0 AND poll_rate_hz >= 1000 AND (wireless_latency_var IS NULL OR wireless_latency_var < 1.0)) ) );"
+    }
+  ]
+}

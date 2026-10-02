@@ -23,9 +23,12 @@
         <dashboard-widget
           :widget="findWidget(item.i)"
           :rows="rows"
+          :filters="filters"
+          :drill-path="drillPaths[String(item.i)] || []"
           @config="$emit('config', $event)"
           @remove="$emit('remove', $event)"
           @drill-down="$emit('drill-down', $event)"
+          @drill-navigate="$emit('drill-navigate', $event)"
         />
       </grid-item>
     </grid-layout>
@@ -40,8 +43,10 @@ import DashboardWidget from './DashboardWidget.vue'
 const props = defineProps({
   widgets: { type: Array, default: () => [] },
   rows: { type: Array, default: () => [] },
+  filters: { type: Array, default: () => [] },
+  drillPaths: { type: Object, default: () => ({}) },
 })
-const emit = defineEmits(['update:layout', 'config', 'remove', 'drill-down'])
+const emit = defineEmits(['update:layout', 'config', 'remove', 'drill-down', 'drill-navigate'])
 
 const layoutModel = computed(() =>
   props.widgets.map(w => ({ i: String(w.id), x: w.x, y: w.y, w: w.w, h: w.h }))

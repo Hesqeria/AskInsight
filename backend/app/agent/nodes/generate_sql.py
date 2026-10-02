@@ -1,3 +1,4 @@
+import asyncio
 """generate_sql 节点（P0+P1 优化版：DDL 增强 + 维度值注入 + 精简规则 + 多候选投票）"""
 import yaml
 from langchain_core.output_parsers import StrOutputParser
@@ -10,6 +11,7 @@ from app.agent.llm import llm
 from app.core.log import logger
 from app.core.metrics import SQL_GENERATED
 from app.core.sql_dialect import get_dialect_info
+from app.ontology.plan import render_sql_from_plan
 from app.prompt.prompt_loader import load_prompt
 
 
@@ -160,8 +162,16 @@ def build_glossary_hint(state: DataAgentState) -> str:
     if not glossary:
         return ""
     lines = ["【术语映射】"]
-    for g in glossary[:5]:
-        lines.append(f"- '{g.get('term','')}' → {g.get('table_name','')}.{g.get('standard_name','')}")
+    for g in glossary[:8]:
+        term = g.get('term', '')
+        table = g.get('table_name', '')
+        col = g.get('column_name') or g.get('standard_name', '')
+        desc = g.get('description', '')
+        # 含状态码/时间/规则描述的 term 带说明（desc 中常有 "已支付=order_status='1002'" 这类映射）
+        if table:
+            lines.append(f"- '{term}' → {table}.{col}")
+        else:
+            lines.append(f"- '{term}' → {desc}")
     return "\n".join(lines) + "\n\n"
 
 
@@ -175,8 +185,43 @@ def build_feedback_hint(state: DataAgentState) -> str:
     return "\n".join(lines) + "\n\n"
 
 
-def _clean_sql(sql: str) -> str:
+def build_plan_hint(state: DataAgentState) -> str:
+    """EQ007/008: inject ranking/period-over-period hints from
+    semantic_plan into the LLM prompt so the LLM picks up ORDER BY LIMIT
+    and LAG() window patterns even when confidence < 0.7 (LLM path)."""
+    plan_dict = state.get("semantic_plan") or {}
+    if not plan_dict:
+        return ""
+    notes = plan_dict.get("notes", []) or []
+    order_by = plan_dict.get("order_by", []) or []
+    limit = plan_dict.get("limit")
+    hints = []
+    if order_by:
+        parts = []
+        for o in order_by:
+            parts.append(f"{o.get('column','')} {o.get('direction','DESC')}")
+        hint = "【排名提示】问题含排名/Top-N 语义，SQL 必须包含 ORDER BY " + ", ".join(parts)
+        if limit:
+            hint += f" LIMIT {limit}"
+        hints.append(hint + "，否则结果会返回多行而非最高/最低的那一条。")
+    note_text = " ".join(notes)
+    if "period-over-period" in note_text or "环比" in note_text or "同比" in note_text:
+        hints.append(
+            "【环比/同比提示】问题含环比/同比语义，使用 LAG() 窗口函数计算上期值，"
+            "公式：(本期 - LAG(本期) OVER (ORDER BY dt)) / LAG(本期) OVER (ORDER BY dt) * 100。"
+            "示例：SELECT (cur.gmv - prev.gmv) / prev.gmv * 100 AS growth_rate FROM "
+            "(SELECT dt, SUM(gmv) AS gmv, LAG(SUM(gmv)) OVER (ORDER BY dt) AS prev_gmv "
+            "FROM ads_gmv_total_day WHERE dt BETWEEN 上期起 AND 本期末 GROUP BY dt) t"
+        )
+    if not hints:
+        return ""
+    return chr(10).join(hints) + chr(10) + chr(10)
+
+
+def _clean_sql(sql) -> str:
     """6重格式清理 (Vanna#187 SQLBot#725)"""
+    if not isinstance(sql, str):
+        raise ValueError(f"LLM 返回非字符串 SQL: type={type(sql).__name__}, value={str(sql)[:200]}")
     bt = chr(96) * 3
     nl = chr(10)
     # 1. markdown code block
@@ -202,7 +247,8 @@ def _clean_sql(sql: str) -> str:
     return sql
 
 
-async def _generate_one(chain, ddl, metrics, date_info, db_info, query) -> str:
+async def _generate_one(chain, ddl, metrics, date_info, db_info, query,
+                        exemplars="(none)", learnings="(none)") -> str:
     """生成一条候选 SQL"""
     sql = await chain.ainvoke({
         "ddl": ddl,
@@ -210,14 +256,67 @@ async def _generate_one(chain, ddl, metrics, date_info, db_info, query) -> str:
         "date_info": date_info,
         "db_info": db_info,
         "query": query,
-    })
+     "exemplars": exemplars, "learnings": learnings})
     return _clean_sql(sql)
+
+
+def _dict_to_plan(d: dict):
+    """Reconstruct a SemanticPlan from its dict form (state passes dicts).
+    Delegates to SemanticPlan.from_dict (single source of truth)."""
+    from app.ontology.plan import SemanticPlan
+    return SemanticPlan.from_dict(d)
+
+
+
+
+async def _persist_candidates(runtime, state, candidates, final_sql, chosen_by):
+    """P3: 候选 SQL 留痕（PRD §6 一次准确率统计的数据源，best-effort）"""
+    try:
+        repo = runtime.context.get("meta_doris_repository")
+        rid = state.get("_request_id", "")
+        if repo is None or not rid or not candidates:
+            return
+        from datetime import datetime as _dt
+        from sqlalchemy import text as _text
+        for i, c in enumerate(candidates):
+            await repo.session.execute(_text(
+                "INSERT INTO data_agent.sql_candidate "
+                "(request_id, cand_no, sql_text, chosen, chosen_by, created_at) "
+                "VALUES (:rid, :no, :s, :ch, :cb, :ca)"),
+                {"rid": rid, "no": i + 1, "s": c[:4000],
+                 "ch": c == final_sql, "cb": chosen_by, "ca": _dt.now()})
+        await repo.session.commit()
+    except Exception as e:
+        logger.warning(f"sql_candidate persistence skipped: {e}")
 
 
 async def generate_sql(state: DataAgentState, runtime: Runtime[DataAgentContext]):
     writer = runtime.stream_writer
     writer({"stage": "生成 SQL"})
     try:
+        # --- P4 short-circuit: render from semantic_plan if grounded ---
+        plan_dict = state.get("semantic_plan")
+        if (plan_dict and plan_dict.get("confidence", 0) >= 0.7
+                and (not plan_dict.get("pop", False)
+                     # dual-period compare with materialized windows is
+                     # deterministically rendered (UNION ALL) - no LLM
+                     or plan_dict.get("pop_windows"))):
+            try:
+                plan = _dict_to_plan(plan_dict)
+                sql = render_sql_from_plan(plan)
+                logger.info(f"SemanticPlan rendered SQL (conf={plan.confidence}): {sql[:120]}")
+                await _persist_candidates(runtime, state, [sql], sql, "plan_render")
+                SQL_GENERATED.inc()
+                from app.agent.events import emit
+                emit("sql/generated", {"sql": sql[:800], "source": "plan_render"})
+                # Renderer output is registry-grounded and deterministic -
+                # tag it so assess_complexity never routes it into the
+                # correct_sql degradation path (which used to rewrite a
+                # correct 5-join query into a lossy simpler one).
+                return {"sql": sql, "sql_source": "plan_render"}
+            except Exception as e:
+                logger.warning(f"plan render failed, falling back to LLM: {e}")
+
         table_infos = state.get("table_infos", [])
         metric_infos = state.get("metric_infos", [])
         date_info = state.get("date_info", {})
@@ -234,39 +333,123 @@ async def generate_sql(state: DataAgentState, runtime: Runtime[DataAgentContext]
         dim_hint = build_dimension_hint(state)
         glossary_hint = build_glossary_hint(state)
         feedback_hint = build_feedback_hint(state)
-        enriched_query = dim_hint + glossary_hint + feedback_hint + state["query"]
+        plan_hint = build_plan_hint(state)
+        enriched_query = dim_hint + glossary_hint + feedback_hint + plan_hint + state["query"]
+
+        # M8: injection budget - estimate, trim by priority
+        # (plan_hint > dimension > glossary > DDL > few-shot > history),
+        # record context/pressure. Never trims the query itself.
+        try:
+            from app.core.token_meter import budget_parts, record_pressure
+            _parts = {
+                "ddl": ddl_str, "metrics": metric_str,
+                "dimension": dim_hint, "glossary": glossary_hint,
+                "few_shot": feedback_hint, "plan_hint": plan_hint,
+                "query": state["query"],
+            }
+            _bounded, _trims = budget_parts(_parts)
+            ddl_str = _bounded.get("ddl", ddl_str)
+            dim_hint = _bounded.get("dimension", dim_hint)
+            glossary_hint = _bounded.get("glossary", glossary_hint)
+            feedback_hint = _bounded.get("few_shot", feedback_hint)
+            plan_hint = _bounded.get("plan_hint", plan_hint)
+            record_pressure("generate_sql", _parts, _bounded, _trims)
+            if _trims:
+                logger.info(
+                    f"prompt budget trimmed: "
+                    f"{[(t.part, t.before, t.after) for t in _trims]}"
+                )
+        except Exception as _e:
+            logger.debug(f"token budget skipped (non-fatal): {_e}")
 
         # P1-2: 调试日志
         logger.info(f"DDL 输入({len(table_infos)}表): {ddl_str[:200]}")
         logger.info(f"enriched_query: {enriched_query[:150]}")
 
+        # Vanna-style flywheel: few-shot exemplars of verified question-SQL
+        # pairs (user corrections + successful executions).
+        exemplars = ""
+        try:
+            from app.services import exemplar_store
+            meta_repo = runtime.context.get("meta_doris_repository")
+            import os as _os
+            if meta_repo is not None and _os.getenv("ABLATION_NO_EXEMPLARS") != "1":
+                hits = await exemplar_store.search(
+                    meta_repo.session, runtime.context.get("embedding_client"),
+                    enriched_query, top_k=2)
+                exemplars = exemplar_store.format_for_prompt(hits)
+                if hits:
+                    logger.info(f"exemplar hits: {len(hits)} "
+                                f"(top score {hits[0]['score']})")
+        except Exception as ex_err:
+            logger.debug(f"exemplar retrieval skipped: {ex_err}")
+            exemplars = "(none)"
+
+        # dash-style learnings: recent pitfalls the pipeline paid for.
+        learnings = "(none)"
+        try:
+            from app.services import sql_learning_store
+            import os as _os2
+            meta_repo = runtime.context.get("meta_doris_repository")
+            if meta_repo is not None and _os2.getenv("ABLATION_NO_EXEMPLARS") != "1":
+                lrows = await sql_learning_store.recent_learnings(
+                    meta_repo.session, limit=3)
+                if lrows:
+                    learnings = sql_learning_store.format_for_prompt(lrows)
+                    logger.info(f"learnings injected: {len(lrows)} pitfalls")
+        except Exception as le:
+            logger.debug(f"learnings skipped: {le}")
+
         prompt = PromptTemplate(
             template=load_prompt("generate_sql"),
-            input_variables=["ddl", "metrics", "date_info", "db_info", "query"],
+            input_variables=["ddl", "metrics", "date_info", "db_info", "query",
+                             "exemplars", "learnings"],
         )
         chain = prompt | llm | StrOutputParser()
 
         # P1-3: 多候选 SQL 投票（生成 2 条，选一致的）
-        candidates = []
-        for i in range(3):
+        # Latency gate: with a single reasoning model each candidate is
+        # ~30-60s. Plan confidence >=0.7 means grounding is trustworthy
+        # -> single candidate; ambiguous plans keep voting.
+        try:
+            _plan_d = state.get("semantic_plan") or {}
+            _conf = float(_plan_d.get("confidence", 0) or 0)
+        except Exception:
+            _plan_d, _conf = {}, 0
+        # pop plans: exemplars + rehydrated DDL support 2-candidate voting
+        # (window SQL is slow to generate; the 3rd call rarely changes it)
+        _n_cand = 1 if _conf >= 0.7 else (1 if _plan_d.get("pop") else 2)
+        # Parallel candidate generation: serial xN cost 60-180s on the
+        # main model; gathered it collapses to one candidate's latency.
+        async def _safe_one():
             try:
-                sql = await _generate_one(chain, ddl_str, metric_str, date_str, db_str, enriched_query)
-                candidates.append(sql)
+                return await _generate_one(chain, ddl_str, metric_str,
+                                           date_str, db_str, enriched_query,
+                                           exemplars, learnings)
             except Exception as e:
-                logger.warning(f"候选 {i+1} 生成失败: {e}")
+                logger.warning(f"候选生成失败: {e}")
+                return None
+
+        _results = await asyncio.gather(
+            *[_safe_one() for _ in range(_n_cand + 1)])
+        candidates = [c for c in _results if c]
 
         if not candidates:
             raise RuntimeError("所有候选 SQL 生成失败")
 
         # P1-3 投票（3条候选）：如果两条一致 → 直接用；不一致 → 选较短的非 "不存在" 的
         final_sql = candidates[0]
+        chosen_by = "single" if len(candidates) == 1 else "first"
         if len(candidates) >= 2:
             if candidates[0] == candidates[1]:
+                chosen_by = "consensus"
                 logger.info("两候选一致，直接采用")
             else:
                 # 优先选非 "不存在" 的
                 for c in candidates:
                     if "不存在" not in c and "message" not in c.lower():
+                        if c != final_sql:
+                            chosen_by = "first_nonempty"
                         final_sql = c
                         logger.info(f"投票：选非空候选 -> {c[:80]}")
                         break
@@ -274,8 +457,12 @@ async def generate_sql(state: DataAgentState, runtime: Runtime[DataAgentContext]
                     # 都含"不存在"，取第一条
                     logger.info("两候选都返回'不存在'，取第一条")
 
+        await _persist_candidates(runtime, state, candidates, final_sql, chosen_by)
+
         logger.info(f"最终 SQL: {final_sql[:120]}")
         SQL_GENERATED.inc()
+        from app.agent.events import emit
+        emit("sql/generated", {"sql": final_sql[:800], "source": "llm"})
         return {"sql": final_sql}
     except Exception as e:
         logger.error(f"生成 SQL 异常: {e}")

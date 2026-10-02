@@ -21,6 +21,56 @@ def test_recommender_uses_metadata():
     assert all("ods_" in s or "dwd_" in s for s in result.source_tables)
 
 
+def test_recommender_parses_llm_json():
+    """ETLModelRecommender must actually parse the LLM's JSON response
+    instead of discarding it (regression test for the dead-code _parse_llm)."""
+    from app.agents.etl_agent.recommender import ETLModelRecommender, ETLRequirement
+
+    class FakeLLM:
+        def complete(self, msgs, task_type=None, temperature=0):
+            return {"content": (
+                '```json\n'
+                '{"fact_tables": [{'
+                '"name": "dwd_order_detail", "layer": "dwd",'
+                ' "grain": "per-order", "dimensions": ["user_id", "dt"],'
+                '"measures": [{"name": "amt", "aggregation": "sum",'
+                ' "source_column": "ods_order.amount", "description": "金额"}]'
+                '}],'
+                '"dimension_tables": [{'
+                '"name": "dim_user", "source_table": "ods_user",'
+                ' "key_column": "user_id", "attributes": ["name"], "scd_type": 2'
+                '}],'
+                '"source_tables": ["ods_order", "ods_user"],'
+                '"grain": "per-order",'
+                '"partition_strategy": "daily by dt",'
+                '"rationale": "订单流水作为事实表"}\n'
+                '```')}
+
+    rec = ETLModelRecommender(llm=FakeLLM())
+    req = ETLRequirement("req_llm", "订单流水", "admin")
+    result = asyncio.run(rec.recommend(req))
+    assert len(result.fact_tables) == 1
+    assert result.fact_tables[0].name == "dwd_order_detail"
+    assert result.fact_tables[0].measures[0].source_column == "ods_order.amount"
+    assert result.dimension_tables[0].scd_type == 2
+    assert result.rationale == "订单流水作为事实表"
+
+
+def test_recommender_falls_back_on_garbage_llm_output():
+    from app.agents.etl_agent.recommender import ETLModelRecommender, ETLRequirement
+
+    class FakeLLM:
+        def complete(self, msgs, task_type=None, temperature=0):
+            return {"content": "no JSON here"}
+
+    rec = ETLModelRecommender(llm=FakeLLM())
+    req = ETLRequirement("req_garbage", "GMV daily", "admin")
+    result = asyncio.run(rec.recommend(req))
+    # Falls back to rule-based design.
+    assert len(result.fact_tables) == 1
+    assert result.fact_tables[0].name.startswith("dws_")
+
+
 def test_sql_generator_ddl_partitioned():
     from app.agents.etl_agent.recommender import ETLModelRecommender, ETLRequirement
     from app.agents.etl_agent.sql_generator import ETLSQLGenerator

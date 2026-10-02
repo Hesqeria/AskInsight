@@ -9,6 +9,7 @@
         <router-link to="/admin/prompts" class="nav-item">Prompts</router-link>
         <router-link to="/admin/feedback" class="nav-item">Feedback</router-link>
         <router-link to="/admin/audit" class="nav-item">Audit Log</router-link>
+        <router-link to="/admin/gov" class="nav-item">Governance</router-link>
         <router-link to="/" class="nav-item back">Home</router-link>
       </nav>
     </aside>

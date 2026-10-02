@@ -1,6 +1,15 @@
 """P5-01: ETL requirement understanding & Kimball model recommendation."""
+import json
 from dataclasses import dataclass, field
 from typing import Optional
+
+
+def _extract_json_object(content):
+    """Tolerantly extract the first JSON object from an LLM response.
+    Delegates to app.core.json_guard.safe_json_parse (single source of
+    truth - three agent copies of this existed and drifted)."""
+    from app.core.json_guard import safe_json_parse
+    return safe_json_parse(content)
 
 
 @dataclass
@@ -112,7 +121,61 @@ class ETLModelRecommender:
                 f"建模规范: {_MODELING_STANDARDS}{NL}候选源表: {','.join(candidates)}{NL}输出JSON")
 
     def _parse_llm(self, content, candidates):
-        return self._rule_based(ETLRequirement("llm", content, "llm"), candidates)
+        """Parse the LLM's JSON response into a ModelRecommendation. The
+        prompt requests an object with the same shape as
+        ModelRecommendation.to_dict(). Falls back to rule-based on any
+        parse/validation failure so callers always get a usable result.
+        """
+        data = _extract_json_object(content)
+        if data is None:
+            return self._rule_based(
+                ETLRequirement("llm", content or "", "llm"), candidates)
+        try:
+            fact_tables = []
+            for raw in data.get("fact_tables") or []:
+                if not isinstance(raw, dict):
+                    continue
+                measures = []
+                for m in raw.get("measures") or []:
+                    if isinstance(m, dict):
+                        measures.append(MeasureDesign(
+                            name=str(m.get("name") or ""),
+                            aggregation=str(m.get("aggregation") or "sum"),
+                            source_column=str(m.get("source_column") or ""),
+                            description=str(m.get("description") or ""),
+                        ))
+                fact_tables.append(FactTableDesign(
+                    name=str(raw.get("name") or ""),
+                    layer=str(raw.get("layer") or "dwd"),
+                    grain=str(raw.get("grain") or ""),
+                    dimensions=list(raw.get("dimensions") or []),
+                    measures=measures,
+                    partition_key=str(raw.get("partition_key") or "dt"),
+                ))
+
+            dim_tables = []
+            for raw in data.get("dimension_tables") or []:
+                if not isinstance(raw, dict):
+                    continue
+                dim_tables.append(DimensionDesign(
+                    name=str(raw.get("name") or ""),
+                    source_table=str(raw.get("source_table") or ""),
+                    key_column=str(raw.get("key_column") or ""),
+                    attributes=list(raw.get("attributes") or []),
+                    scd_type=int(raw.get("scd_type") or 1),
+                ))
+
+            return ModelRecommendation(
+                fact_tables=fact_tables,
+                dimension_tables=dim_tables,
+                source_tables=list(data.get("source_tables") or candidates),
+                grain=str(data.get("grain") or ""),
+                partition_strategy=str(data.get("partition_strategy") or ""),
+                rationale=str(data.get("rationale") or ""),
+            )
+        except (TypeError, ValueError, AttributeError):
+            return self._rule_based(
+                ETLRequirement("llm", content or "", "llm"), candidates)
 
     def _rule_based(self, req, candidates):
         source = candidates[:2] if candidates else ["ods_order"]

@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 const routes = [
+  { path: '/login', name: 'Login', component: () => import('../views/Login.vue') },
   { path: '/', name: 'Chat', component: () => import('../components/chat/ChatView.vue') },
   { path: '/dashboard', name: 'Dashboard', component: () => import('../views/Dashboard.vue') },
   { path: '/schema', name: 'Schema', component: () => import('../views/Schema.vue') },
@@ -14,11 +15,23 @@ const routes = [
   { path: '/admin/audit', name: 'Audit', component: () => import('../views/admin/Audit.vue') },
   { path: '/admin/pipelines', name: 'Pipelines', component: () => import('../views/admin/PipelinesDashboard.vue') },
   { path: '/admin/readiness', name: 'Readiness', component: () => import('../views/admin/ReadinessDashboard.vue') },
+  { path: '/admin/gov', name: 'Gov', component: () => import('../views/admin/GovDashboard.vue') },
 ]
 
 const router = createRouter({
   history: createWebHistory(),
   routes,
+})
+
+// Auth guard: no token -> login page (token may be expired; api.js
+// also redirects to /login on any 401). e2e tests inject a token via
+// addInitScript so they pass through.
+router.beforeEach((to) => {
+  const token = localStorage.getItem('token')
+  if (to.path !== '/login' && !token) {
+    return { path: '/login', query: to.fullPath && to.fullPath !== '/' ? { redirect: to.fullPath } : {} }
+  }
+  if (to.path === '/login' && token) return '/'
 })
 
 export default router

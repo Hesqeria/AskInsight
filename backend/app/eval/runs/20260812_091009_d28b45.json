@@ -1,0 +1,32 @@
+{
+  "run_id": "20260812_091009_d28b45",
+  "model": "deepseek-v4-pro-mockdate",
+  "results": [
+    {
+      "question_id": "EQ001",
+      "level1_intent": true,
+      "level2_executable": true,
+      "level3_ex": false,
+      "level4_llm_judge": false,
+      "level4_confidence": 0.0,
+      "level4_reason": "",
+      "final_pass": false,
+      "pred_sql": "SELECT SUM(total_amount) AS 总GMV FROM dws_sales_wide WHERE dt = '2026-08-03' LIMIT 1000",
+      "gold_rows": 1,
+      "pred_rows": 1,
+      "error_msg": "",
+      "latency_ms": 30,
+      "match_reason": "不匹配: gold_rows=1 pred_rows=1",
+      "question": "昨天总 GMV 是多少",
+      "entity": "Order",
+      "sql_complexity": "Easy",
+      "bird_difficulty": "Simple",
+      "m1_schema_f1_table": 0.0,
+      "m1_schema_f1_col": 0.8,
+      "m3_ast_similarity": 0.0,
+      "m2_component_overall": 0.5476,
+      "m2_component_select": 0.0,
+      "m2_component_where": 0.2857
+    }
+  ]
+}
